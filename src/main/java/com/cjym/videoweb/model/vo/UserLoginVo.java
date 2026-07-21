@@ -23,4 +23,7 @@ public class UserLoginVo {
 
     @Schema(name = "验证码")
     private String captcha;
+
+    @Schema(name = "登录方式")
+    private String loginType;
 }

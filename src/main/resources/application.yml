@@ -5,7 +5,19 @@ server:
   port: 8899
 
 spring:
-
+  # 邮件发送服务配置
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: 2657463589@qq.com
+    password: ukilygkkaeisdjcg
+    default-encoding: UTF-8
+    properties:
+      mail:
+        debug: true
+        smtp:
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher

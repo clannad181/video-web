@@ -35,6 +35,12 @@ public class UserDto implements UserDetails {
     @Schema(description = "盐值")
     private String salt;
 
+    @Schema(description = "用户头像")
+    private String avatar;
+
+    @Schema(description = "用户昵称")
+    private String nikeName;
+
     private String roles;
 
     @Override

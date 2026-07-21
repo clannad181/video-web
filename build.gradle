@@ -40,6 +40,9 @@ dependencies {
     // EasyCaptcha 验证码生成
     implementation 'io.github.eternalstone:captcha-spring-boot-starter:3.0.0'
 
+    // Java Mail 邮件发送
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
     // Redis 缓存 (Lettuce 连接池)
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.apache.commons:commons-pool2'

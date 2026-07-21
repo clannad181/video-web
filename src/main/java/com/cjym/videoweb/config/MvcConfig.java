@@ -1,10 +1,18 @@
 package com.cjym.videoweb.config;
 
+import com.cjym.videoweb.handler.interceptor.TokenAccessInterceptor;
+import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
 @Configuration
-public class MvcConfig implements WebMvcConfigurer{
+public class MvcConfig implements WebMvcConfigurer {
+
+    @Resource
+    private TokenAccessInterceptor tokenAccessInterceptor;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")  //指定允许跨域请求的路径模式为"/**"，表示所有的路径都将允许跨域访问。
@@ -13,5 +21,12 @@ public class MvcConfig implements WebMvcConfigurer{
                 .allowedHeaders("*") // 允许的请求头
                 .allowCredentials(false) // 是否允许发送凭证信息
                 .maxAge(3600); // 预检请求的有效期
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(tokenAccessInterceptor)
+                .addPathPatterns("/**")         // 拦截所有路径
+                .excludePathPatterns("/admin/user/login", "/admin/user/captcha","/admin/user/refresh"); // 排除不需要拦截的路径
     }
 }

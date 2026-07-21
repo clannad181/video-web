@@ -33,12 +33,10 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         //获取密码
         String password = authentication.getCredentials().toString();
         UserDto user = (UserDto) customUserDetailsServiceImpl.loadUserByUsername(username);
-
         // 2. 自定义状态检查
         if (!user.isEnabled()) {
             throw new GlobeException("账户已禁用");
         }
-        // 可继续添加其他检查：isAccountNonLocked、isAccountNonExpired 等
         // 密码加盐传输
         password= user.getSalt() + BaseConstant.SALT_SPITE_IDX + password;
         // 3. 密码校验

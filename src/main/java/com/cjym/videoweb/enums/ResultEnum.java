@@ -33,6 +33,7 @@ public enum ResultEnum {
   LEND_INVEST_ERROR(305, "当前状态无法投标"),
   LEND_FULL_SCALE_ERROR(306, "已满标，无法投标"),
   NOT_SUFFICIENT_FUNDS_ERROR(307, "余额不足，请充值"),
+  FORBIDDEN_ERROR(403, "无权限访问"),
   PAY_UNIFIEDORDER_ERROR(401, "统一下单错误"),
   ALIYUN_SMS_LIMIT_CONTROL_ERROR(-502, "短信发送过于频繁"),//业务限流
   ALIYUN_SMS_ERROR(-503, "短信发送失败"),//其他失败
@@ -40,9 +41,11 @@ public enum ResultEnum {
   WEIXIN_FETCH_ACCESSTOKEN_ERROR(-602, "获取access_token失败"),
   WEIXIN_FETCH_USERINFO_ERROR(-603, "获取用户信息失败"),
   EMAIL_NULL_ERROR(207, "邮箱不能为空"),
-  EMAIL_ERROR(208, "邮箱不正确"), TOKEN_ERROR(503, "token错误"),
+  EMAIL_ERROR(208, "邮箱不存在"), TOKEN_ERROR(503, "token错误"),
   EMAIL_SEND_ERROR(408, "邮件发送失败"),
-  AUTH_PERMISSION_NULL(410,"暂无任何权限，请联系管理员");
+  AUTH_PERMISSION_NULL(410,"暂无任何权限，请联系管理员"),
+  CAPTCHA_EXPIRE(500, "验证码已过期"),
+  USER_DISABLE(411, "用户已禁用");
 
 
   //响应状态码

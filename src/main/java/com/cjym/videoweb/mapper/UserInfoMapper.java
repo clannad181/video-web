@@ -20,7 +20,7 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
     /**
      * 按邮箱查询
      */
-    UserInfo selectByEmail(@Param("email") String email);
+    UserDto selectDtoByEmail(@Param("email") String email);
 
     /**
      * 条件分页查询
@@ -32,4 +32,7 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
                                   @Param("isVip") Boolean isVip);
 
     Optional<UserDto> findByUsername(@Param("username") String username);
+
+
+    UserDto selectDtoByUsername(@Param("username") String username);
 }
