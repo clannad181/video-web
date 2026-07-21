@@ -46,10 +46,10 @@ public enum ResultEnum {
 
 
   //响应状态码
-  private Integer code;
+  private final Integer code;
 
   //描述信息
-  private String message;
+  private final String message;
 
 
 
