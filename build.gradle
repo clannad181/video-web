@@ -37,6 +37,13 @@ dependencies {
     // Knife4j API 文档 (Spring Boot 3.x Jakarta EE)
     implementation 'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter:4.5.0'
 
+    // EasyCaptcha 验证码生成
+    implementation 'io.github.eternalstone:captcha-spring-boot-starter:3.0.0'
+
+    // Redis 缓存 (Lettuce 连接池)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.apache.commons:commons-pool2'
+
     // MyBatis-Plus ORM (Spring Boot 3.x)
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter:3.5.10.1'
     // MyBatis-Plus 代码生成器 (开发时使用)

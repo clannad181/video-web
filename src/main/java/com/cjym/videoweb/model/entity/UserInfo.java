@@ -1,15 +1,14 @@
-package com.cjym.videoweb.entity;
+package com.cjym.videoweb.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-
 import java.time.LocalDateTime;
 
 @TableName(schema = "public")
 @Data
-public class UserInfo {
+public class UserInfo{
     @Schema(description = "主键id")
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
@@ -72,4 +71,7 @@ public class UserInfo {
 
     @Version
     private Integer version;
+
+    @Schema(description = "盐值")
+    private String salt;
 }

@@ -1,21 +1,35 @@
 package com.cjym.videoweb.controller.admin;
 
 
+import com.cjym.videoweb.model.vo.CaptchaVo;
+import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.result.R;
+import com.cjym.videoweb.service.UserInfoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.annotation.Resource;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/user")
 @Tag(name = "用户信息管理", description = "用户信息管理")
 public class UserInfoController {
+    @Resource
+    private UserInfoService userInfoService;
+
 
     @GetMapping("/captcha")
     @Operation(summary = "获取验证码", description = "获取验证码")
-    public String getCaptcha(String captchaType,String username) {
+    public R<CaptchaVo> getCaptcha(@RequestParam String captchaType, @RequestParam(required = false) String email) {
+        return userInfoService.getCaptcha(captchaType, email);
+    }
 
-        return "captcha";
+    @PostMapping("/login")
+    @Operation(summary = "用户登录", description = "用户登录")
+    public R<Map<String,Object>> login(@RequestBody UserLoginVo userLoginVo) {
+        userInfoService.login(userLoginVo);
+        return null;
     }
 }

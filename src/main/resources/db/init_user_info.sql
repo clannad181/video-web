@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS public.user_info (
     update_user BIGINT,
     update_time TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
     is_delete   BOOLEAN         DEFAULT FALSE,
-    version     INTEGER         DEFAULT 0
+    version     INTEGER         DEFAULT 0,
+    salt        VARCHAR(32)
 );
 
 -- 注释
@@ -44,3 +45,4 @@ COMMENT ON COLUMN public.user_info.update_user IS '更新人';
 COMMENT ON COLUMN public.user_info.update_time IS '更新时间';
 COMMENT ON COLUMN public.user_info.is_delete   IS '是否删除（逻辑删除）';
 COMMENT ON COLUMN public.user_info.version     IS '乐观锁版本号';
+COMMENT ON COLUMN public.user_info.salt        IS '密码盐值（Base64编码的16字节随机盐）';

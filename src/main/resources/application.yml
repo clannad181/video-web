@@ -1,8 +1,14 @@
 # 服务端口
 server:
+  servlet:
+    context-path: /api
   port: 8899
 
 spring:
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
   application:
     name: video-web
   # 数据源配置
@@ -11,3 +17,21 @@ spring:
     username: postgres
     password: postgres123
     driver-class-name: org.postgresql.Driver
+  # redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.cjym.videoweb.model.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: isDelete
+      logic-delete-value: true
+      logic-not-delete-value: false
