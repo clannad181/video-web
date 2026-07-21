@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.1.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.cjym'
+version = '0.0.1-SNAPSHOT'
+description = 'video-web'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'cn.hutool:hutool-all:5.8.40'
+
+    // Spring Security 安全框架
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // JWT 令牌认证 (JJWT 0.12.x)
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // Lombok 简化代码
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Knife4j API 文档 (Spring Boot 3.x Jakarta EE)
+    implementation 'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter:4.5.0'
+
+    // MyBatis-Plus ORM (Spring Boot 3.x)
+    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter:3.5.10.1'
+    // MyBatis-Plus 代码生成器 (开发时使用)
+    implementation 'com.baomidou:mybatis-plus-generator:3.5.10.1'
+    implementation 'org.apache.velocity:velocity-engine-core:2.3'
+
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

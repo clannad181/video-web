@@ -1,0 +1,13 @@
+# 服务端口
+server:
+  port: 8899
+
+spring:
+  application:
+    name: video-web
+  # 数据源配置
+  datasource:
+    url: jdbc:postgresql://localhost:5432/video?currentSchema=public&sslmode=disable
+    username: postgres
+    password: postgres123
+    driver-class-name: org.postgresql.Driver
