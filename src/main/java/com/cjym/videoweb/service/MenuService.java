@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.MenuDto;
 import com.cjym.videoweb.model.entity.Menu;
+import com.cjym.videoweb.model.vo.MenuOptionVo;
 import com.cjym.videoweb.result.R;
 
 import java.util.List;
@@ -39,4 +40,9 @@ public interface MenuService extends IService<Menu> {
      * 获取菜单树结构
      */
     R<List<MenuDto>> getMenuTree();
+
+    /**
+     * 获取菜单列表（仅返回id和名称）
+     */
+    R<List<MenuOptionVo>> getMenuOptions();
 }

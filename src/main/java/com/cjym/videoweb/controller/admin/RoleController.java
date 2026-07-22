@@ -2,13 +2,17 @@ package com.cjym.videoweb.controller.admin;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.RoleDto;
+import com.cjym.videoweb.model.dto.RoleMenuBindDto;
 import com.cjym.videoweb.model.entity.Role;
 import com.cjym.videoweb.result.R;
+import com.cjym.videoweb.service.RoleMenuBindService;
 import com.cjym.videoweb.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/admin/role")
@@ -17,6 +21,9 @@ public class RoleController {
 
     @Resource
     private RoleService roleService;
+
+    @Resource
+    private RoleMenuBindService roleMenuBindService;
 
     @PostMapping("/add")
     @Operation(summary = "新增角色", description = "新增角色")
@@ -50,5 +57,17 @@ public class RoleController {
                                        @RequestParam(required = false) Boolean status,
                                        @RequestParam(required = false) String createUserName) {
         return roleService.listRoles(page, size, name, status, createUserName);
+    }
+
+    @PostMapping("/toggleMenu")
+    @Operation(summary = "切换角色菜单绑定", description = "任一菜单已绑定则取消该角色全部菜单绑定，均未绑定则批量新增")
+    public R<String> toggleMenuBind(@RequestBody RoleMenuBindDto dto) {
+        return roleMenuBindService.toggleBind(dto.getRoleId(), dto.getMenuIds());
+    }
+
+    @GetMapping("/getBindMenuIds")
+    @Operation(summary = "获取角色绑定的菜单", description = "获取角色绑定的菜单")
+    public R<List<Long>> getBindMenuIds(Long roleId) {
+        return roleMenuBindService.getBindMenuIds(roleId);
     }
 }

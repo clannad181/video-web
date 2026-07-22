@@ -3,6 +3,7 @@ package com.cjym.videoweb.controller.admin;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.MenuDto;
 import com.cjym.videoweb.model.entity.Menu;
+import com.cjym.videoweb.model.vo.MenuOptionVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.MenuService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,11 +21,11 @@ public class MenuController {
     @Resource
     private MenuService menuService;
 
-    @PostMapping("/add")
-    @Operation(summary = "新增菜单", description = "新增菜单")
-    public R<String> addMenu(@RequestBody Menu menu) {
-        return menuService.addMenu(menu);
-    }
+//    @PostMapping("/add")
+//    @Operation(summary = "新增菜单", description = "新增菜单")
+//    public R<String> addMenu(@RequestBody Menu menu) {
+//        return menuService.addMenu(menu);
+//    }
 
     @PostMapping("/update")
     @Operation(summary = "修改菜单", description = "修改菜单")
@@ -57,5 +58,11 @@ public class MenuController {
     @Operation(summary = "获取菜单树", description = "获取完整的菜单树结构")
     public R<List<MenuDto>> getMenuTree() {
         return menuService.getMenuTree();
+    }
+
+    @GetMapping("/options")
+    @Operation(summary = "获取菜单选项列表", description = "获取全部菜单id和名称，用于下拉选择")
+    public R<List<MenuOptionVo>> getMenuOptions() {
+        return menuService.getMenuOptions();
     }
 }

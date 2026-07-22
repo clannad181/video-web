@@ -8,6 +8,7 @@ import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.MenuMapper;
 import com.cjym.videoweb.model.dto.MenuDto;
 import com.cjym.videoweb.model.entity.Menu;
+import com.cjym.videoweb.model.vo.MenuOptionVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.MenuService;
 import io.micrometer.common.util.StringUtils;
@@ -137,27 +138,54 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
             return dto;
         }).collect(Collectors.toList());
 
-        // 建立 id → MenuDto 的映射，便于查找父节点并设置 parentMenuName
+        // 建立 id → MenuDto 的映射，便于查找父节点
         Map<Long, MenuDto> idMap = allDtos.stream()
                 .collect(Collectors.toMap(MenuDto::getId, d -> d));
 
-        // 为每个节点设置父菜单名称
+        // 为每个节点设置父菜单名称，并挂载到父节点的 children 中
         for (MenuDto dto : allDtos) {
             if (dto.getParentId() != null && dto.getParentId() != 0) {
                 MenuDto parent = idMap.get(dto.getParentId());
                 if (parent != null) {
                     dto.setParentMenuName(parent.getMenuName());
+                    parent.getChildren().add(dto);
                 }
             }
         }
 
+        // 返回根节点（已自动包含子节点）
+        List<MenuDto> treeRoots = allDtos.stream()
+                .filter(d -> d.getParentId() == null || d.getParentId() == 0)
+                .collect(Collectors.toList());
+        return R.success(treeRoots);
+    }
+
+    @Override
+    public R<List<MenuOptionVo>> getMenuOptions() {
+        LambdaQueryWrapper<Menu> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(Menu::getId, Menu::getMenuName, Menu::getParentId, Menu::getIcon)
+               .orderByAsc(Menu::getDescSort, Menu::getId);
+        List<Menu> menus = baseMapper.selectList(wrapper);
+
+        // 转为 VO 并建立 id → VO 映射
+        List<MenuOptionVo> allVos = menus.stream()
+                .map(m -> new MenuOptionVo(m.getId(), m.getMenuName(), m.getParentId(), m.getIcon()))
+                .collect(Collectors.toList());
+        Map<Long, List<MenuOptionVo>> parentIdMap = allVos.stream()
+                .filter(v -> v.getParentId() != null && v.getParentId() != 0)
+                .collect(Collectors.groupingBy(MenuOptionVo::getParentId));
+
         // 构建树形结构
-        List<MenuDto> treeRoots = new ArrayList<>();
-        for (MenuDto dto : allDtos) {
-            if (dto.getParentId() == null || dto.getParentId() == 0) {
-                treeRoots.add(dto);
+        List<MenuOptionVo> tree = new ArrayList<>();
+        for (MenuOptionVo vo : allVos) {
+            if (vo.getParentId() == null || vo.getParentId() == 0) {
+                tree.add(vo);
+            }
+            List<MenuOptionVo> children = parentIdMap.get(vo.getId());
+            if (children != null) {
+                vo.setChildren(children);
             }
         }
-        return R.success(treeRoots);
+        return R.success(tree);
     }
 }
