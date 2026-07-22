@@ -32,7 +32,7 @@ public class UserInfo{
     private String avatar;
 
     @Schema(description = "用户类型（0-普通用户，1-管理员用户）")
-    private Boolean type;
+    private Integer type;
 
     @Schema(description = "用户角色Id")
     private String roleId;
@@ -69,7 +69,7 @@ public class UserInfo{
     @TableLogic
     private Boolean isDelete;
 
-    @Version
+//    @Version
     private Integer version;
 
     @Schema(description = "盐值")

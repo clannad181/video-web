@@ -3,6 +3,7 @@ package com.cjym.videoweb.controller.admin;
 
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.vo.CaptchaVo;
+import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.UserInfoService;
@@ -44,5 +45,11 @@ public class UserInfoController {
     @Operation(summary = "token刷新",description = "token刷新")
     public R<Map<String,Object>> refresh(HttpServletRequest request) {
         return userInfoService.refresh(request);
+    }
+
+    @PostMapping("/resetPassword")
+    @Operation(summary = "重置密码", description = "重置密码")
+    public R<String> resetPassword(@RequestBody PasswordVo passwordVo) {
+        return userInfoService.resetPassword(passwordVo);
     }
 }

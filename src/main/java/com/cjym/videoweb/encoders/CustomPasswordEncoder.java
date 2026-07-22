@@ -2,9 +2,9 @@ package com.cjym.videoweb.encoders;
 
 import cn.hutool.crypto.digest.DigestUtil;
 import com.cjym.videoweb.constant.BaseConstant;
+import com.cjym.videoweb.utils.MD5Util;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import java.util.Base64;
 
 /**
  * 自定义 MD5 加盐密码编码器
@@ -61,22 +61,7 @@ public class CustomPasswordEncoder implements PasswordEncoder {
         if (rawPassword == null || hash == null || salt == null) {
             return false;
         }
-        String result = md5WithSalt(rawPassword.toString(), salt);
-        System.out.println(rawPassword);
-        System.out.println(salt);
-        System.out.println(result);
+        String result = MD5Util.md5WithSalt(rawPassword.toString(), salt);
         return hash.equals(result);
-    }
-
-    /**
-     * MD5(Base64盐原文 + 明文)
-     */
-    private String md5WithSalt(String password, String saltBase64) {
-        byte[] salt = Base64.getDecoder().decode(saltBase64);
-        byte[] passwordBytes = password.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        byte[] combined = new byte[salt.length + passwordBytes.length];
-        System.arraycopy(salt, 0, combined, 0, salt.length);
-        System.arraycopy(passwordBytes, 0, combined, salt.length, passwordBytes.length);
-        return DigestUtil.md5Hex(combined);
     }
 }

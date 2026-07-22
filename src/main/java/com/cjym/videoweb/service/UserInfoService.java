@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.vo.CaptchaVo;
+import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
 import com.cjym.videoweb.result.R;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,4 +35,10 @@ public interface UserInfoService extends IService<UserInfo> {
      * token刷新
      * */
     R<Map<String, Object>> refresh(HttpServletRequest request);
+
+    /**
+     * 重置密码
+     * @param passwordVo 密码信息
+     * */
+    R<String> resetPassword(PasswordVo passwordVo);
 }

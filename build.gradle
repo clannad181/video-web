@@ -49,6 +49,8 @@ dependencies {
 
     // MyBatis-Plus ORM (Spring Boot 3.x)
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter:3.5.10.1'
+    // MyBatis-Plus 分页插件 JSqlParser 支持
+    implementation 'com.baomidou:mybatis-plus-jsqlparser:3.5.10.1'
     // MyBatis-Plus 代码生成器 (开发时使用)
     implementation 'com.baomidou:mybatis-plus-generator:3.5.10.1'
     implementation 'org.apache.velocity:velocity-engine-core:2.3'

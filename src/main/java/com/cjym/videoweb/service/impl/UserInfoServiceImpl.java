@@ -1,5 +1,6 @@
 package com.cjym.videoweb.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.CaptchaConstant;
@@ -9,11 +10,13 @@ import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.model.vo.CaptchaVo;
+import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EmailSendService;
 import com.cjym.videoweb.service.UserInfoService;
 import com.cjym.videoweb.utils.JWTUtil;
+import com.cjym.videoweb.utils.MD5Util;
 import io.github.eternalstone.captcha.gp.base.TextEntry;
 import io.github.eternalstone.captcha.gp.captcha.SpecCaptcha;
 import io.micrometer.common.util.StringUtils;
@@ -148,6 +151,31 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         String newRefreshToken = JWTUtil.createRefreshToken(BaseConstant.SYS_ADMIN,username);
         // 5. 返回新的 Token 对
         return R.success(Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken));
+    }
+
+    @Override
+    public R<String> resetPassword(PasswordVo passwordVo) {
+        Long userId = passwordVo.getUserId();
+        String username = passwordVo.getUsername();
+        LambdaQueryWrapper<UserInfo> lambdaQueryWrapper=new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(UserInfo::getId, userId);
+        lambdaQueryWrapper.eq(UserInfo::getUserName, username);
+        UserInfo userInfo = baseMapper.selectOne(lambdaQueryWrapper);
+        if(ObjectUtils.isEmpty(userInfo)){
+            throw new GlobeException("用户不存在");
+        }
+        String oldPassword = MD5Util.md5WithSalt(passwordVo.getOldPassword(), userInfo.getSalt());
+        if(!userInfo.getPassword().equals(oldPassword)){
+            throw new GlobeException("旧密码错误");
+        }
+        //重新生成盐值
+        String salt = MD5Util.generateSalt();
+        //重新加密
+        String newPassword = MD5Util.md5WithSalt(passwordVo.getNewPassword(), salt);
+        userInfo.setSalt(salt);
+        userInfo.setPassword(newPassword);
+        baseMapper.updateById(userInfo);
+        return R.success("密码重置成功");
     }
 
     public void saveRefreshToken(String refreshToken,String username) {

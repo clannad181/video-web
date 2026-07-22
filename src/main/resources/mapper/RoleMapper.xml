@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.RoleMapper">
+
+    <!-- ==================== 通用结果映射 ==================== -->
+    <resultMap id="BaseResultMap" type="com.cjym.videoweb.model.entity.Role">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="create_user" property="createUser" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <!-- ==================== RoleDto 结果映射（含创建人昵称） ==================== -->
+    <resultMap id="RoleDtoResultMap" type="com.cjym.videoweb.model.dto.RoleDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="create_user_name" property="createUserName" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <!-- ==================== 通用字段列表 ==================== -->
+    <sql id="BaseColumnList">
+        id, name, description, status, create_user, create_time, is_delete
+    </sql>
+
+    <!-- ==================== 按角色名称查询 ==================== -->
+    <select id="selectByName" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM public.role
+        WHERE name = #{name,jdbcType=VARCHAR}
+          AND is_delete = 0
+    </select>
+
+    <!-- ==================== 多条件分页查询（含创建人昵称） ==================== -->
+    <select id="selectPageList" resultMap="RoleDtoResultMap">
+        SELECT r.id, r.name, r.description, r.status, r.create_time, r.is_delete, r.sys_def,r.create_user_nickname,
+               u.user_name AS create_user_name
+        FROM public.role r
+        LEFT JOIN public.user_info u ON r.create_user = u.id
+        <where>
+            r.is_delete = 0
+            <if test="name != null and name != ''">
+                AND r.name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="status != null">
+                AND r.status = #{status}
+            </if>
+            <if test="createUserName != null and createUserName != ''">
+                AND r.create_user_nickname LIKE CONCAT('%', #{createUserName}, '%')
+            </if>
+        </where>
+        ORDER BY r.create_time DESC
+    </select>
+
+</mapper>
