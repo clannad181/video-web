@@ -2,6 +2,7 @@ package com.cjym.videoweb.utils;
 
 import cn.hutool.crypto.digest.DigestUtil;
 
+import java.security.SecureRandom;
 import java.util.Base64;
 
 public class MD5Util {
@@ -23,6 +24,7 @@ public class MD5Util {
      * */
     public static String generateSalt() {
         byte[] salt = new byte[16];
+        new SecureRandom().nextBytes(salt);
         return Base64.getEncoder().encodeToString(salt);
     }
 }

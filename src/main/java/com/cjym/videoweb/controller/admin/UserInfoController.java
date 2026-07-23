@@ -69,7 +69,7 @@ public class UserInfoController {
         return userInfoService.updateUser(userUpdateVo);
     }
 
-    @DeleteMapping("/delete/{id}")
+    @GetMapping("/delete/{id}")
     @Operation(summary = "删除用户", description = "删除用户（逻辑删除）")
     public R<String> deleteUser(@PathVariable Long id) {
         return userInfoService.deleteUser(id);
