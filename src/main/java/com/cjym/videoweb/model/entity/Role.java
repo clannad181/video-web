@@ -25,6 +25,9 @@ public class Role {
     @Schema(description = "角色状态")
     private Boolean status;
 
+    @Schema(description = "角色等级")
+    private Integer level;
+
     @Schema(description = "创建人id")
     @TableField(fill = FieldFill.INSERT)
     private Long createUser;
@@ -39,6 +42,7 @@ public class Role {
 
     @Schema(description = "创建者昵称")
     private String createUserNickname;
+
 
     @Schema(description = "是否删除")
     @TableField(value = "is_delete", fill = FieldFill.INSERT)

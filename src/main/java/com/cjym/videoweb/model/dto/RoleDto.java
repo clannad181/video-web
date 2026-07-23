@@ -22,6 +22,9 @@ public class RoleDto {
     @Schema(description = "角色状态")
     private Boolean status;
 
+    @Schema(description = "角色等级")
+    private Integer level;
+
     @Schema(description = "创建人账号")
     private String createUserName;
 

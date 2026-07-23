@@ -25,17 +25,17 @@ public class JWTUtil {
     private static final long refreshValidity = 604800000;  // 7 天
 
     // 生成 Access Token
-    public static String createAccessToken(String serverType, String username,
+    public static String createAccessToken(Long userId, String serverType, String username,
                                            Collection<? extends GrantedAuthority> authorities) {
-        return buildToken(serverType, username, authorities, accessValidity, BaseConstant.TOKEN_ACCESS);
+        return buildToken(userId,serverType, username, authorities, accessValidity, BaseConstant.TOKEN_ACCESS);
     }
 
     // 生成 Refresh Token
-    public static String createRefreshToken(String serverType, String username) {
-        return buildToken(serverType, username, Collections.emptyList(), refreshValidity, BaseConstant.TOKEN_REFRESH);
+    public static String createRefreshToken(Long userId, String serverType, String username) {
+        return buildToken(userId,serverType, username, Collections.emptyList(), refreshValidity, BaseConstant.TOKEN_REFRESH);
     }
 
-    private static String buildToken(String serverType, String username,
+    private static String buildToken(Long userId, String serverType, String username,
                                      Collection<? extends GrantedAuthority> authorities,
                                      long validity, String tokenType) {
         Date now = new Date();
@@ -46,7 +46,8 @@ public class JWTUtil {
                 .issuedAt(now)
                 .expiration(expiry)
                 .claim("serverType", serverType)
-                .claim("type", tokenType);
+                .claim("type", tokenType)
+                .claim("userId",userId);
 
         if ("access".equals(tokenType)) {
             builder.claim("auth", authorities.stream()

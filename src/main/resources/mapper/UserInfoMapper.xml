@@ -25,6 +25,22 @@
         <result column="salt" property="salt" jdbcType="VARCHAR"/>
     </resultMap>
 
+    <!-- ==================== UserPageDto 结果映射（含角色名称） ==================== -->
+    <resultMap id="UserPageDtoResultMap" type="com.cjym.videoweb.model.dto.UserPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_name" property="userName" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nikeName" jdbcType="VARCHAR"/>
+        <result column="email" property="email" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="type" property="type" jdbcType="INTEGER"/>
+        <result column="is_vip" property="isVip" jdbcType="BOOLEAN"/>
+        <result column="role_id" property="roleId" jdbcType="BIGINT"/>
+        <result column="role_name" property="roleName" jdbcType="VARCHAR"/>
+        <result column="level" property="level" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
     <!-- ==================== 通用字段列表 ==================== -->
     <sql id="BaseColumnList">
         id, user_name, password, email, is_vip, nike_name, avatar,
@@ -38,7 +54,7 @@
         SELECT <include refid="BaseColumnList"/>
         FROM public.user_info
         WHERE user_name = #{userName,jdbcType=VARCHAR}
-          AND is_delete = false
+          AND is_delete = 0
     </select>
 
     <!-- ==================== 按邮箱查询 ==================== -->
@@ -47,32 +63,41 @@
                create_time, create_user, update_user, update_time, is_delete, version, salt
         FROM public.user_info
         WHERE email = #{email,jdbcType=VARCHAR}
-          AND is_delete = false and type=1
+          AND is_delete = 0 and type=1
     </select>
 
-    <!-- ==================== 条件分页查询 ==================== -->
-    <select id="selectPageList" resultMap="BaseResultMap">
-        SELECT <include refid="BaseColumnList"/>
-        FROM public.user_info
+    <!-- ==================== 多条件分页查询用户列表（含角色名称） ==================== -->
+    <select id="selectUserPage" resultMap="UserPageDtoResultMap">
+        SELECT u.id, u.user_name, u.nike_name, u.email, u.avatar,
+               u.status, u.type, u.is_vip, u.role_id, u.create_time,
+               r.name AS role_name,r.level
+        FROM public.user_info u
+        LEFT JOIN public.role r ON u.role_id = r.id
         <where>
-            is_delete = false
+            u.is_delete = 0
             <if test="userName != null and userName != ''">
-                AND user_name LIKE CONCAT('%', #{userName}, '%')
+                AND u.user_name LIKE CONCAT('%', #{userName}, '%')
+            </if>
+            <if test="nikeName != null and nikeName != ''">
+                AND u.nike_name LIKE CONCAT('%', #{nikeName}, '%')
             </if>
             <if test="email != null and email != ''">
-                AND email LIKE CONCAT('%', #{email}, '%')
+                AND u.email LIKE CONCAT('%', #{email}, '%')
             </if>
             <if test="status != null">
-                AND status = #{status}
+                AND u.status = #{status}
+            </if>
+            <if test="roleId != null">
+                AND u.role_id = #{roleId}
             </if>
             <if test="type != null">
-                AND type = #{type}
+                AND u.type = #{type}
             </if>
             <if test="isVip != null">
-                AND is_vip = #{isVip}
+                AND u.is_vip = #{isVip}
             </if>
         </where>
-        ORDER BY create_time DESC
+        ORDER BY u.create_time DESC
     </select>
     <select id="findByUsername" resultType="com.cjym.videoweb.model.dto.UserDto">
         SELECT id, user_name, password, email, is_vip, nike_name, avatar, type, role_id, status, descript, sex,

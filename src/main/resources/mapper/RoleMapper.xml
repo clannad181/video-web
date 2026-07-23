@@ -8,6 +8,7 @@
         <result column="name" property="name" jdbcType="VARCHAR"/>
         <result column="description" property="description" jdbcType="VARCHAR"/>
         <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="level" property="level" jdbcType="INTEGER"/>
         <result column="create_user" property="createUser" jdbcType="BIGINT"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
@@ -19,6 +20,7 @@
         <result column="name" property="name" jdbcType="VARCHAR"/>
         <result column="description" property="description" jdbcType="VARCHAR"/>
         <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="level" property="level" jdbcType="INTEGER"/>
         <result column="create_user_name" property="createUserName" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
@@ -26,7 +28,7 @@
 
     <!-- ==================== 通用字段列表 ==================== -->
     <sql id="BaseColumnList">
-        id, name, description, status, create_user, create_time, is_delete
+        id, name, description, status, level, create_user, create_time, is_delete
     </sql>
 
     <!-- ==================== 按角色名称查询 ==================== -->
@@ -39,7 +41,7 @@
 
     <!-- ==================== 多条件分页查询（含创建人昵称） ==================== -->
     <select id="selectPageList" resultMap="RoleDtoResultMap">
-        SELECT r.id, r.name, r.description, r.status, r.create_time, r.is_delete, r.sys_def,r.create_user_nickname,
+        SELECT r.id, r.name, r.description, r.status, r.level, r.create_time, r.is_delete, r.sys_def,r.create_user_nickname,
                u.user_name AS create_user_name
         FROM public.role r
         LEFT JOIN public.user_info u ON r.create_user = u.id

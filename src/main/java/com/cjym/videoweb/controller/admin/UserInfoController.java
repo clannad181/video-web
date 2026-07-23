@@ -1,10 +1,14 @@
 package com.cjym.videoweb.controller.admin;
 
 
-import com.cjym.videoweb.model.dto.UserDto;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.model.vo.UserAddVo;
+import com.cjym.videoweb.model.vo.UserUpdateVo;
+import com.cjym.videoweb.model.vo.UserVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.UserInfoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,7 +41,7 @@ public class UserInfoController {
 
     @GetMapping("/userInfo")
     @Operation(summary = "获取用户信息",description = "获取用户信息")
-    public R<UserDto> getUserInfo(HttpServletRequest request) {
+    public R<UserVo> getUserInfo(HttpServletRequest request) {
         return userInfoService.getUserInfo(request);
     }
 
@@ -52,4 +56,37 @@ public class UserInfoController {
     public R<String> resetPassword(@RequestBody PasswordVo passwordVo) {
         return userInfoService.resetPassword(passwordVo);
     }
+
+    @PostMapping("/add")
+    @Operation(summary = "新增用户", description = "新增用户")
+    public R<String> addUser(@RequestBody UserAddVo userAddVo) {
+        return userInfoService.addUser(userAddVo);
+    }
+
+    @PostMapping("/update")
+    @Operation(summary = "更新用户", description = "更新用户信息（只更新传入的非空字段）")
+    public R<String> updateUser(@RequestBody UserUpdateVo userUpdateVo) {
+        return userInfoService.updateUser(userUpdateVo);
+    }
+
+    @DeleteMapping("/delete/{id}")
+    @Operation(summary = "删除用户", description = "删除用户（逻辑删除）")
+    public R<String> deleteUser(@PathVariable Long id) {
+        return userInfoService.deleteUser(id);
+    }
+
+    @GetMapping("/list")
+    @Operation(summary = "多条件分页查询用户列表", description = "多条件分页查询用户列表（用户名、昵称、邮箱、状态、角色、类型、大会员）")
+    public R<IPage<UserPageDto>> listUsers(@RequestParam(defaultValue = "1") Integer page,
+                                           @RequestParam(defaultValue = "10") Integer size,
+                                           @RequestParam(required = false) String userName,
+                                           @RequestParam(required = false) String nikeName,
+                                           @RequestParam(required = false) String email,
+                                           @RequestParam(required = false) Integer status,
+                                           @RequestParam(required = false) Long roleId,
+                                           @RequestParam(required = false) Integer type,
+                                           @RequestParam(required = false) Boolean isVip) {
+        return userInfoService.listUsers(page, size, userName, nikeName, email, status, roleId, type, isVip);
+    }
+
 }

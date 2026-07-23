@@ -34,6 +34,9 @@ public class Menu {
     @Schema(description = "菜单图标")
     private String icon;
 
+    @Schema(description = "菜单类别")
+    private String category;
+
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT)

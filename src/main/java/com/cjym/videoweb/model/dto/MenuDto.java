@@ -35,6 +35,9 @@ public class MenuDto {
     @Schema(description = "菜单图标")
     private String icon;
 
+    @Schema(description = "菜单类别")
+    private String category;
+
     @Schema(description = "父菜单名称")
     private String parentMenuName;
 

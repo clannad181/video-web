@@ -34,7 +34,19 @@ spring:
     redis:
       host: localhost
       port: 6379
+  # 文件上传配置
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
 
+# 文件上传配置
+file:
+  upload:
+    path: D:/uploads          # 文件存储根路径
+    url-prefix: http://localhost:8899/api/admin/file/preview   # 文件访问地址前缀
+    chunk-size: 5MB           # 单个分片最大大小
 # MyBatis-Plus 配置
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml

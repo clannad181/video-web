@@ -27,7 +27,8 @@ public class GlobExceptionHandler {
     @ExceptionHandler({
             Exception.class,
             AsyncRequestTimeoutException.class,
-            ConnectException.class
+            ConnectException.class,
+            NumberFormatException.class
     })
     public R<String> otherException(Exception e){
         log.error("发生错误");

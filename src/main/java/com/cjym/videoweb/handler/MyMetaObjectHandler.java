@@ -26,18 +26,27 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
     public void insertFill(MetaObject metaObject) {
         // 创建时间
         this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
-        // 是否删除（默认 0 = 未删除）
+        // 更新时间
+        this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+        // 是否删除（默认 0 = 未删除），实体中为 Integer 类型
         this.strictInsertFill(metaObject, "isDelete", Integer.class, 0);
         // 创建人：从当前请求的 JWT token 中获取用户ID
         Long currentUserId = getCurrentUserId();
         if (currentUserId != null) {
             this.strictInsertFill(metaObject, "createUser", Long.class, currentUserId);
+            this.strictInsertFill(metaObject, "updateUser", Long.class, currentUserId);
         }
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        // Role 表暂无需要更新时自动填充的字段
+        // 更新时间
+        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+        // 更新人：从当前请求的 JWT token 中获取用户ID
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId != null) {
+            this.strictUpdateFill(metaObject, "updateUser", Long.class, currentUserId);
+        }
     }
 
     /**

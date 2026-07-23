@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.RoleDto;
 import com.cjym.videoweb.model.dto.RoleMenuBindDto;
 import com.cjym.videoweb.model.entity.Role;
+import com.cjym.videoweb.model.vo.RoleOptionVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.RoleMenuBindService;
 import com.cjym.videoweb.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,14 +35,14 @@ public class RoleController {
 
     @PostMapping("/update")
     @Operation(summary = "修改角色", description = "修改角色")
-    public R<String> updateRole(@RequestBody Role role) {
-        return roleService.updateRole(role);
+    public R<String> updateRole(@RequestBody Role role, HttpServletRequest request) {
+        return roleService.updateRole(role, request);
     }
 
     @GetMapping("/delete/{id}")
     @Operation(summary = "删除角色", description = "删除角色")
-    public R<String> deleteRole(@PathVariable Long id) {
-        return roleService.deleteRole(id);
+    public R<String> deleteRole(@PathVariable Long id, HttpServletRequest request) {
+        return roleService.deleteRole(id, request);
     }
 
     @GetMapping("/{id}")
@@ -70,4 +72,11 @@ public class RoleController {
     public R<List<Long>> getBindMenuIds(Long roleId) {
         return roleMenuBindService.getBindMenuIds(roleId);
     }
+
+    @GetMapping("/options")
+    @Operation(summary = "获取所有角色的id和名称", description = "获取所有角色选项（id+名称），用于下拉框")
+    public R<List<RoleOptionVo>> getAllRoleOptions() {
+        return roleService.getAllRoleOptions();
+    }
+    
 }

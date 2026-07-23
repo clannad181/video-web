@@ -27,6 +27,7 @@ public class MvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(tokenAccessInterceptor)
                 .addPathPatterns("/**")         // 拦截所有路径
-                .excludePathPatterns("/admin/user/login", "/admin/user/captcha","/admin/user/refresh"); // 排除不需要拦截的路径
+                .excludePathPatterns("/admin/user/login", "/admin/user/captcha","/admin/user/refresh",
+                        "/admin/file/preview/**", "/admin/file/download/**"); // 排除不需要拦截的路径
     }
 }

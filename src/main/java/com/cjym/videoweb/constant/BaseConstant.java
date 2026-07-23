@@ -32,9 +32,24 @@ public class BaseConstant {
     public static final Integer MAX_SESSIONS=3;
 
     /**
-     * token类型
+     * token类型-access-token
      * */
     public static final String TOKEN_ACCESS="access";
 
+    /**
+     * token类型-refresh-token
+     * */
     public static final String TOKEN_REFRESH="refresh";
+
+    /**
+     * 用户类型-管理员
+     * */
+    public static final Integer USER_TYPE_ADMIN=1;
+
+    /**
+     * 用户类型-用户
+     * */
+    public static final Integer USER_TYPE_USER=0;
+
+    public static final Long DEFAULT_FRONT_USER_ROLE_ID = 9999L;
 }

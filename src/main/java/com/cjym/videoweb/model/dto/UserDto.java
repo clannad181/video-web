@@ -41,6 +41,9 @@ public class UserDto implements UserDetails {
     @Schema(description = "用户昵称")
     private String nikeName;
 
+    @Schema(description = "系统类型")
+    private Integer type;
+
     private String roles;
 
     @Override

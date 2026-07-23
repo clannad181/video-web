@@ -35,7 +35,7 @@ public class UserInfo{
     private Integer type;
 
     @Schema(description = "用户角色Id")
-    private String roleId;
+    private Long roleId;
 
     @Schema(description = "用户状态 0-正常，1-禁用")
     private Integer status;
@@ -66,8 +66,8 @@ public class UserInfo{
 
     @Schema(description = "是否删除")
     @TableField(value = "is_delete",fill = FieldFill.INSERT)
-    @TableLogic
-    private Boolean isDelete;
+    @TableLogic(value = "0", delval = "1")
+    private Integer isDelete;
 
 //    @Version
     private Integer version;
