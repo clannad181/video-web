@@ -28,6 +28,6 @@ public class MvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(tokenAccessInterceptor)
                 .addPathPatterns("/**")         // 拦截所有路径
                 .excludePathPatterns("/admin/user/login", "/admin/user/captcha","/admin/user/refresh",
-                        "/admin/file/preview/**", "/admin/file/download/**"); // 排除不需要拦截的路径
+                        "/file/preview/**", "/file/download/**"); // 排除不需要拦截的路径
     }
 }

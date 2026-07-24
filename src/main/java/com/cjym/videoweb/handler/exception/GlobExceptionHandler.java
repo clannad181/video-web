@@ -34,7 +34,6 @@ public class GlobExceptionHandler {
         log.error("发生错误");
         log.error(e.getMessage());
         e.printStackTrace();
-//        return R.error(ResultEnum.MAINTAIN.getMesage());
         return R.error(e.getMessage());
     }
 }

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.OperationLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.cjym.videoweb.model.entity.OperationLog">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="username" property="username" jdbcType="VARCHAR"/>
+        <result column="module" property="module" jdbcType="VARCHAR"/>
+        <result column="operation" property="operation" jdbcType="VARCHAR"/>
+        <result column="method" property="method" jdbcType="VARCHAR"/>
+        <result column="request_uri" property="requestUri" jdbcType="VARCHAR"/>
+        <result column="request_method" property="requestMethod" jdbcType="VARCHAR"/>
+        <result column="request_params" property="requestParams" jdbcType="VARCHAR"/>
+        <result column="ip_address" property="ipAddress" jdbcType="VARCHAR"/>
+        <result column="execution_time" property="executionTime" jdbcType="BIGINT"/>
+        <result column="result_status" property="resultStatus" jdbcType="INTEGER"/>
+        <result column="error_message" property="errorMessage" jdbcType="VARCHAR"/>
+        <result column="error_stack_trace" property="errorStackTrace" jdbcType="VARCHAR"/>
+        <result column="log_type" property="logType" jdbcType="INTEGER"/>
+        <result column="system_type" property="systemType" jdbcType="INTEGER"/>
+        <result column="operation_time" property="operationTime" jdbcType="TIMESTAMP"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <resultMap id="OperationLogPageDtoResultMap" type="com.cjym.videoweb.model.dto.OperationLogPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="username" property="username" jdbcType="VARCHAR"/>
+        <result column="module" property="module" jdbcType="VARCHAR"/>
+        <result column="operation" property="operation" jdbcType="VARCHAR"/>
+        <result column="method" property="method" jdbcType="VARCHAR"/>
+        <result column="request_uri" property="requestUri" jdbcType="VARCHAR"/>
+        <result column="request_method" property="requestMethod" jdbcType="VARCHAR"/>
+        <result column="ip_address" property="ipAddress" jdbcType="VARCHAR"/>
+        <result column="execution_time" property="executionTime" jdbcType="BIGINT"/>
+        <result column="result_status" property="resultStatus" jdbcType="INTEGER"/>
+        <result column="error_message" property="errorMessage" jdbcType="VARCHAR"/>
+        <result column="log_type" property="logType" jdbcType="INTEGER"/>
+        <result column="system_type" property="systemType" jdbcType="INTEGER"/>
+        <result column="operation_time" property="operationTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="selectOperationLogPage" resultMap="OperationLogPageDtoResultMap">
+        SELECT id, username, module, operation, method,
+               request_uri, request_method, ip_address,
+               execution_time, result_status, error_message,
+               log_type, system_type, operation_time
+        FROM public.operation_log
+        <where>
+            is_delete = 0
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="module != null and module != ''">
+                AND module LIKE CONCAT('%', #{module}, '%')
+            </if>
+            <if test="logType != null">
+                AND log_type = #{logType}
+            </if>
+            <if test="resultStatus != null">
+                AND result_status = #{resultStatus}
+            </if>
+            <if test="systemType != null">
+                AND system_type = #{systemType}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND operation_time &gt;= TO_TIMESTAMP(#{startTime}, 'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND operation_time &lt;= TO_TIMESTAMP(#{endTime}, 'YYYY-MM-DD HH24:MI:SS')
+            </if>
+        </where>
+        ORDER BY operation_time DESC
+    </select>
+
+    <!-- 日志统计总览：单次 SQL 同时统计 login_log + operation_log -->
+    <resultMap id="LogOverviewMap" type="com.cjym.videoweb.model.vo.LogOverviewVo">
+        <result column="loginTotal" property="loginTotal"/>
+        <result column="loginSuccess" property="loginSuccess"/>
+        <result column="loginFailure" property="loginFailure"/>
+        <result column="operationTotal" property="operationTotal"/>
+        <result column="businessException" property="businessException"/>
+        <result column="systemException" property="systemException"/>
+    </resultMap>
+
+    <select id="selectLogOverview" resultMap="LogOverviewMap">
+        SELECT
+            (SELECT COUNT(*) FROM public.login_log WHERE is_delete = 0) AS "loginTotal",
+            (SELECT COUNT(*) FROM public.login_log WHERE is_delete = 0 AND login_status = 1) AS "loginSuccess",
+            (SELECT COUNT(*) FROM public.login_log WHERE is_delete = 0 AND login_status = 0) AS "loginFailure",
+            (SELECT COUNT(*) FROM public.operation_log WHERE is_delete = 0) AS "operationTotal",
+            (SELECT COUNT(*) FROM public.operation_log WHERE is_delete = 0 AND result_status = 1) AS "businessException",
+            (SELECT COUNT(*) FROM public.operation_log WHERE is_delete = 0 AND result_status = 0) AS "systemException"
+    </select>
+
+</mapper>

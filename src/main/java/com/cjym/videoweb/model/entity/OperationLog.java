@@ -1,0 +1,77 @@
+package com.cjym.videoweb.model.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+@TableName(schema = "public")
+@Schema(description = "运行日志")
+public class OperationLog {
+
+    @Schema(description = "主键id")
+    @TableId(value = "id", type = IdType.AUTO)
+    private Long id;
+
+    @Schema(description = "操作用户ID")
+    private Long userId;
+
+    @Schema(description = "操作用户名")
+    private String username;
+
+    @Schema(description = "所属模块")
+    private String module;
+
+    @Schema(description = "操作描述")
+    private String operation;
+
+    @Schema(description = "执行方法（类名.方法名）")
+    private String method;
+
+    @Schema(description = "请求URI")
+    private String requestUri;
+
+    @Schema(description = "请求方式：GET/POST/PUT/DELETE")
+    private String requestMethod;
+
+    @Schema(description = "请求参数（JSON）")
+    private String requestParams;
+
+    @Schema(description = "请求IP地址")
+    private String ipAddress;
+
+    @Schema(description = "执行耗时（毫秒）")
+    private Long executionTime;
+
+    @Schema(description = "执行状态：0-系统异常，1-业务异常，2-成功")
+    private Integer resultStatus;
+
+    @Schema(description = "错误信息")
+    private String errorMessage;
+
+    @Schema(description = "异常堆栈（仅系统异常时记录）")
+    private String errorStackTrace;
+
+    @Schema(description = "日志类型：0-系统异常，1-业务操作")
+    private Integer logType;
+
+    @Schema(description = "系统类型：1-后台管理，0-前台用户")
+    private Integer systemType;
+
+    @Schema(description = "操作时间")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime operationTime;
+
+    @Schema(description = "创建时间")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    @Schema(description = "是否删除")
+    @TableField(value = "is_delete", fill = FieldFill.INSERT)
+    @TableLogic(value = "0", delval = "1")
+    private Integer isDelete;
+}

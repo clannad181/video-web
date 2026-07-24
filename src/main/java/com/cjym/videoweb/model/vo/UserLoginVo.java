@@ -26,4 +26,7 @@ public class UserLoginVo {
 
     @Schema(name = "登录方式")
     private String loginType;
+
+    @Schema(name = "登录系统")
+    private Integer loginSystem;
 }

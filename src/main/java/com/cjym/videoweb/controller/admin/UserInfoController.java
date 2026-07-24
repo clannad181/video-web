@@ -51,6 +51,12 @@ public class UserInfoController {
         return userInfoService.refresh(request);
     }
 
+    @GetMapping("/logout")
+    @Operation(summary = "用户登出", description = "用户登出，使refresh-token失效")
+    public R<String> logout(HttpServletRequest request) {
+        return userInfoService.logout(request);
+    }
+
     @PostMapping("/resetPassword")
     @Operation(summary = "重置密码", description = "重置密码")
     public R<String> resetPassword(@RequestBody PasswordVo passwordVo) {

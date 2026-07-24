@@ -41,6 +41,11 @@ public interface UserInfoService extends IService<UserInfo> {
     R<Map<String, Object>> refresh(HttpServletRequest request);
 
     /**
+     * 用户登出
+     * */
+    R<String> logout(HttpServletRequest request);
+
+    /**
      * 重置密码
      * @param passwordVo 密码信息
      * */

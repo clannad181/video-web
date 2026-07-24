@@ -45,7 +45,7 @@ spring:
 file:
   upload:
     path: D:/uploads          # 文件存储根路径
-    url-prefix: http://localhost:8899/api/admin/file/preview   # 文件访问地址前缀
+    url-prefix: /api/file/preview   # 文件访问地址前缀
     chunk-size: 5MB           # 单个分片最大大小
 # MyBatis-Plus 配置
 mybatis-plus:

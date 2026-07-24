@@ -52,4 +52,14 @@ public class BaseConstant {
     public static final Integer USER_TYPE_USER=0;
 
     public static final Long DEFAULT_FRONT_USER_ROLE_ID = 9999L;
+
+    // ==================== Token 有效期配置 key（存放在 web_config 表） ====================
+    /** 前台 Access Token 有效期配置键 */
+    public static final String FRONT_ACCESS_TOKEN_EXPIRY = "front_access_token_expiry";
+    /** 前台 Refresh Token 有效期配置键 */
+    public static final String FRONT_REFRESH_TOKEN_EXPIRY = "front_refresh_token_expiry";
+    /** 后台 Access Token 有效期配置键 */
+    public static final String BACKEND_ACCESS_TOKEN_EXPIRY = "backend_access_token_expiry";
+    /** 后台 Refresh Token 有效期配置键 */
+    public static final String BACKEND_REFRESH_TOKEN_EXPIRY = "backend_refresh_token_expiry";
 }

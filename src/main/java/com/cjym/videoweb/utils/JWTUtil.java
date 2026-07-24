@@ -5,7 +5,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 
 import javax.crypto.SecretKey;
@@ -19,20 +18,28 @@ public class JWTUtil {
             Base64.getDecoder().decode("PMM6r6oiYBSJ98ee3qUWQjBNPGKnl16qENfQr2GFK5g=")
     );
 
-    private static final long accessValidity = 900000;     // 15 分钟
+    /** 默认 access token 有效期：15 分钟（DB 无配置时兜底） */
+    public static final long DEFAULT_ACCESS_VALIDITY = 900_000L;
+    /** 默认 refresh token 有效期：7 天（DB 无配置时兜底） */
+    public static final long DEFAULT_REFRESH_VALIDITY = 604_800_000L;
 
-    @Getter
-    private static final long refreshValidity = 604800000;  // 7 天
-
-    // 生成 Access Token
+    /**
+     * 生成 Access Token
+     * @param accessExpiryMillis 有效期（毫秒），由 TokenExpiryConfigService 提供
+     */
     public static String createAccessToken(Long userId, String serverType, String username,
-                                           Collection<? extends GrantedAuthority> authorities) {
-        return buildToken(userId,serverType, username, authorities, accessValidity, BaseConstant.TOKEN_ACCESS);
+                                           Collection<? extends GrantedAuthority> authorities,
+                                           long accessExpiryMillis) {
+        return buildToken(userId, serverType, username, authorities, accessExpiryMillis, BaseConstant.TOKEN_ACCESS);
     }
 
-    // 生成 Refresh Token
-    public static String createRefreshToken(Long userId, String serverType, String username) {
-        return buildToken(userId,serverType, username, Collections.emptyList(), refreshValidity, BaseConstant.TOKEN_REFRESH);
+    /**
+     * 生成 Refresh Token
+     * @param refreshExpiryMillis 有效期（毫秒），由 TokenExpiryConfigService 提供
+     */
+    public static String createRefreshToken(Long userId, String serverType, String username,
+                                            long refreshExpiryMillis) {
+        return buildToken(userId, serverType, username, Collections.emptyList(), refreshExpiryMillis, BaseConstant.TOKEN_REFRESH);
     }
 
     private static String buildToken(Long userId, String serverType, String username,
@@ -85,6 +92,11 @@ public class JWTUtil {
     }
 
     public String getTokenServerType(String token) {
+        return parseClaims(token).get("serverType", String.class);
+    }
+
+    /** 静态便捷方法：从 token 中提取 serverType */
+    public static String getServerType(String token) {
         return parseClaims(token).get("serverType", String.class);
     }
 

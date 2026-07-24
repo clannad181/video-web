@@ -19,27 +19,26 @@ public class TokenAccessInterceptor implements HandlerInterceptor {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
+        String token = request.getHeader("authorization");
+        if (StringUtils.isEmpty(token)) {
+            response.setContentType("application/json;charset=utf-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
+            return false;
+        }
+        // 去除 Bearer 前缀
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        if (!JWTUtil.validateToken(token)) {
+            response.setContentType("application/json;charset=utf-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
+            return false;
+        }
+        if (!BaseConstant.TOKEN_ACCESS.equals(JWTUtil.getTokenType(token))) {
+            response.setContentType("application/json;charset=utf-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
+            return false;
+        }
         return true;
-//        String token = request.getHeader("authorization");
-//        if (StringUtils.isEmpty(token)) {
-//            response.setContentType("application/json;charset=utf-8");
-//            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
-//            return false;
-//        }
-//        // 去除 Bearer 前缀
-//        if (token.startsWith("Bearer ")) {
-//            token = token.substring(7);
-//        }
-//        if (!JWTUtil.validateToken(token)) {
-//            response.setContentType("application/json;charset=utf-8");
-//            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
-//            return false;
-//        }
-//        if (!BaseConstant.TOKEN_ACCESS.equals(JWTUtil.getTokenType(token))) {
-//            response.setContentType("application/json;charset=utf-8");
-//            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
-//            return false;
-//        }
-//        return true;
     }
 }

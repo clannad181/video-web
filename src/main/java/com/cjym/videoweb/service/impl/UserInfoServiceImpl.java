@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cjym.videoweb.annotation.LogLogin;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.CaptchaConstant;
 import com.cjym.videoweb.enums.ResultEnum;
@@ -27,6 +28,7 @@ import com.cjym.videoweb.model.vo.UserLoginVo;
 import com.cjym.videoweb.model.vo.UserVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EmailSendService;
+import com.cjym.videoweb.service.TokenExpiryConfigService;
 import com.cjym.videoweb.service.UserInfoService;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.MD5Util;
@@ -60,6 +62,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     @Resource
     private EmailSendService emailSendService;
+
+    @Resource
+    private TokenExpiryConfigService tokenExpiryConfigService;
 
     @Resource
     private RoleMapper roleMapper;
@@ -111,6 +116,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
      * 用户登录
      * @param userLoginVo 登录信息
      * */
+    @LogLogin
     @Override
     public R<Map<String,Object>> login(UserLoginVo userLoginVo) {
         UserDto user = null;
@@ -139,8 +145,12 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                 throw new GlobeException(ResultEnum.USER_DISABLE.getMessage());
             }
         }
-        String accessToken = JWTUtil.createAccessToken(user.getId(),BaseConstant.SYS_ADMIN, user.getUsername(), user.getAuthorities());
-        String refreshToken = JWTUtil.createRefreshToken(user.getId(),BaseConstant.SYS_ADMIN, user.getUsername());
+        String accessToken = JWTUtil.createAccessToken(user.getId(), BaseConstant.SYS_ADMIN,
+                user.getUsername(), user.getAuthorities(),
+                tokenExpiryConfigService.getAccessTokenExpiry(BaseConstant.SYS_ADMIN));
+        String refreshToken = JWTUtil.createRefreshToken(user.getId(), BaseConstant.SYS_ADMIN,
+                user.getUsername(),
+                tokenExpiryConfigService.getRefreshTokenExpiry(BaseConstant.SYS_ADMIN));
         saveRefreshToken(refreshToken,user.getUsername());
         return R.success(Map.of("accessToken",accessToken,"refreshToken",refreshToken));
     }
@@ -205,19 +215,35 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     public R<Map<String, Object>> refresh(HttpServletRequest request) {
         String requestRefreshToken = request.getHeader("refresh-token");
         // 1. 验证 Refresh Token 是否有效
-        if (verifyRefreshToken(requestRefreshToken)) {
+        if (!verifyRefreshToken(requestRefreshToken)) {
             return R.error(ResultEnum.FORBIDDEN_ERROR);
         }
-        // 2. 从 JWT 中获取用户名
+        // 2. 从 JWT 中获取用户名和 serverType
         String username = JWTUtil.getUsername(requestRefreshToken);
+        String serverType = JWTUtil.getServerType(requestRefreshToken);
         // 3. 撤销旧 Refresh Token（Rotation：防止旧 token 继续使用）
         deleteByToken(requestRefreshToken);
         // 4. 生成新的 Access Token 和 Refresh Token
         UserDto userDetails = baseMapper.selectDtoByUsername(username);
-        String newAccessToken = JWTUtil.createAccessToken(userDetails.getId(),BaseConstant.SYS_ADMIN,username, userDetails.getAuthorities());
-        String newRefreshToken = JWTUtil.createRefreshToken(userDetails.getId(),BaseConstant.SYS_ADMIN,username);
+        String newAccessToken = JWTUtil.createAccessToken(userDetails.getId(), serverType,
+                username, userDetails.getAuthorities(),
+                tokenExpiryConfigService.getAccessTokenExpiry(serverType));
+        String newRefreshToken = JWTUtil.createRefreshToken(userDetails.getId(), serverType,
+                username,
+                tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
         // 5. 返回新的 Token 对
         return R.success(Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken));
+    }
+
+    @Override
+    public R<String> logout(HttpServletRequest request) {
+        String refreshToken = request.getHeader("refresh-token");
+        if (StringUtils.isNotEmpty(refreshToken)
+                && JWTUtil.validateToken(refreshToken)
+                && BaseConstant.TOKEN_REFRESH.equals(JWTUtil.getTokenType(refreshToken))) {
+            deleteByToken(refreshToken);
+        }
+        return R.success("登出成功");
     }
 
     @Override
@@ -373,8 +399,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     private void cleanExpiredTokens(String userZSetKey) {
         long now = System.currentTimeMillis();
-        long refreshValidity = JWTUtil.getRefreshValidity();
-        long minScore = now - refreshValidity;
+        long minScore = now - TokenExpiryConfigService.MAX_REFRESH_WINDOW;
         // 移除所有 score 小于 minScore 的成员（即过期的 token）
         stringRedisTemplate.opsForZSet().removeRangeByScore(userZSetKey, 0, minScore);
     }

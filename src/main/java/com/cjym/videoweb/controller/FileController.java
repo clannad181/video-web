@@ -1,5 +1,6 @@
 package com.cjym.videoweb.controller;
 
+import com.cjym.videoweb.annotation.LogOperation;
 import com.cjym.videoweb.model.vo.FileCheckResultVo;
 import com.cjym.videoweb.model.vo.FileCheckVo;
 import com.cjym.videoweb.model.vo.FileMergeVo;
@@ -10,12 +11,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/admin/file")
+@RequestMapping("/file")
 @Tag(name = "文件管理", description = "文件上传下载")
 public class FileController {
 
@@ -69,12 +73,9 @@ public class FileController {
 
     private void previewFileInternal(HttpServletResponse response) {
         // 这里使用 RequestContextHolder 获取请求路径（简化处理）
-        jakarta.servlet.http.HttpServletRequest request =
-                ((org.springframework.web.context.request.ServletRequestAttributes)
-                        org.springframework.web.context.request.RequestContextHolder
-                                .currentRequestAttributes()).getRequest();
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
         String requestUri = request.getRequestURI();
-        String prefix = "/api/admin/file/preview/";
+        String prefix = "/api/file/preview/";
         if (requestUri.startsWith(prefix)) {
             String filePath = requestUri.substring(prefix.length());
             fileService.previewFile(filePath, response);

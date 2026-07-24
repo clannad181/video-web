@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.LoginLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.cjym.videoweb.model.entity.LoginLog">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="account" property="account" jdbcType="VARCHAR"/>
+        <result column="login_type" property="loginType" jdbcType="VARCHAR"/>
+        <result column="system_type" property="systemType" jdbcType="INTEGER"/>
+        <result column="ip_address" property="ipAddress" jdbcType="VARCHAR"/>
+        <result column="user_agent" property="userAgent" jdbcType="VARCHAR"/>
+        <result column="login_status" property="loginStatus" jdbcType="INTEGER"/>
+        <result column="fail_reason" property="failReason" jdbcType="VARCHAR"/>
+        <result column="login_time" property="loginTime" jdbcType="TIMESTAMP"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <!-- ==================== LoginLogPageDto 结果映射 ==================== -->
+    <resultMap id="LoginLogPageDtoResultMap" type="com.cjym.videoweb.model.dto.LoginLogPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="account" property="account" jdbcType="VARCHAR"/>
+        <result column="login_type" property="loginType" jdbcType="VARCHAR"/>
+        <result column="system_type" property="systemType" jdbcType="INTEGER"/>
+        <result column="ip_address" property="ipAddress" jdbcType="VARCHAR"/>
+        <result column="user_agent" property="userAgent" jdbcType="VARCHAR"/>
+        <result column="login_status" property="loginStatus" jdbcType="INTEGER"/>
+        <result column="fail_reason" property="failReason" jdbcType="VARCHAR"/>
+        <result column="login_time" property="loginTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- ==================== 多条件分页查询登录日志 ==================== -->
+    <select id="selectLoginLogPage" resultMap="LoginLogPageDtoResultMap">
+        SELECT id, user_id, account, login_type, system_type,
+               ip_address, user_agent, login_status, fail_reason, login_time
+        FROM public.login_log
+        <where>
+            is_delete = 0
+            <if test="account != null and account != ''">
+                AND account LIKE CONCAT('%', #{account}, '%')
+            </if>
+            <if test="systemType != null">
+                AND system_type = #{systemType}
+            </if>
+            <if test="loginStatus != null">
+                AND login_status = #{loginStatus}
+            </if>
+            <if test="loginType != null and loginType != ''">
+                AND login_type = #{loginType}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND login_time &gt;= TO_TIMESTAMP(#{startTime}, 'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND login_time &lt;= TO_TIMESTAMP(#{endTime}, 'YYYY-MM-DD HH24:MI:SS')
+            </if>
+        </where>
+        ORDER BY login_time DESC
+    </select>
+
+    <!-- ==================== 登录趋势：最近7天按日期聚合 ==================== -->
+    <resultMap id="LoginTrendMap" type="com.cjym.videoweb.model.vo.LoginTrendVo">
+        <result column="date" property="date"/>
+        <result column="loginSuccess" property="loginSuccess"/>
+        <result column="loginFailure" property="loginFailure"/>
+    </resultMap>
+
+    <select id="selectLoginTrend" resultMap="LoginTrendMap">
+        SELECT
+            login_time::date AS "date",
+            COUNT(*) FILTER (WHERE login_status = 1) AS "loginSuccess",
+            COUNT(*) FILTER (WHERE login_status = 0) AS "loginFailure"
+        FROM public.login_log
+        WHERE is_delete = 0
+          AND login_time &gt;= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY login_time::date
+        ORDER BY "date"
+    </select>
+
+</mapper>

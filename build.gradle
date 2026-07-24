@@ -20,6 +20,9 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Spring AOP 切面编程
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'cn.hutool:hutool-all:5.8.40'
 
     // Spring Security 安全框架
