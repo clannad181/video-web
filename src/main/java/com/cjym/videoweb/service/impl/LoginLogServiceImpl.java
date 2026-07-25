@@ -8,6 +8,7 @@ import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.model.dto.LoginLogPageDto;
 import com.cjym.videoweb.model.entity.LoginLog;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.LoginAccountRankVo;
 import com.cjym.videoweb.model.vo.LoginTrendVo;
 import com.cjym.videoweb.service.LoginLogService;
 import jakarta.annotation.Resource;
@@ -78,6 +79,11 @@ public class LoginLogServiceImpl extends ServiceImpl<LoginLogMapper, LoginLog> i
             result.add(vo);
         }
         return result;
+    }
+
+    @Override
+    public List<LoginAccountRankVo> getLoginAccountRank() {
+        return baseMapper.selectLoginAccountRank();
     }
 
     /**

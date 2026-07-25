@@ -94,4 +94,41 @@
             (SELECT COUNT(*) FROM public.operation_log WHERE is_delete = 0 AND result_status = 0) AS "systemException"
     </select>
 
+    <!-- 运行日志趋势：最近7天按日期聚合（正常/业务异常/系统异常） -->
+    <resultMap id="OperationTrendMap" type="com.cjym.videoweb.model.vo.OperationTrendVo">
+        <result column="date" property="date"/>
+        <result column="normalCount" property="normalCount"/>
+        <result column="businessException" property="businessException"/>
+        <result column="systemException" property="systemException"/>
+    </resultMap>
+
+    <select id="selectOperationTrend" resultMap="OperationTrendMap">
+        SELECT
+            operation_time::date AS "date",
+            COUNT(*) FILTER (WHERE result_status = 2) AS "normalCount",
+            COUNT(*) FILTER (WHERE result_status = 1) AS "businessException",
+            COUNT(*) FILTER (WHERE result_status = 0) AS "systemException"
+        FROM public.operation_log
+        WHERE is_delete = 0
+          AND operation_time &gt;= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY operation_time::date
+        ORDER BY "date"
+    </select>
+
+    <!-- 访问IP排行：最近7天访问次数最多的3个IP -->
+    <resultMap id="IpRankMap" type="com.cjym.videoweb.model.vo.IpRankVo">
+        <result column="ipAddress" property="ipAddress"/>
+        <result column="count" property="count"/>
+    </resultMap>
+
+    <select id="selectIpRank" resultMap="IpRankMap">
+        SELECT ip_address AS "ipAddress", COUNT(*) AS count
+        FROM public.operation_log
+        WHERE is_delete = 0
+          AND operation_time &gt;= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY ip_address
+        ORDER BY count DESC
+        LIMIT 3
+    </select>
+
 </mapper>

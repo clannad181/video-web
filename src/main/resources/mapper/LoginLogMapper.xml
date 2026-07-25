@@ -79,4 +79,20 @@
         ORDER BY "date"
     </select>
 
+    <!-- ==================== 登录账号排行：最近7天 TOP3 ==================== -->
+    <resultMap id="LoginAccountRankMap" type="com.cjym.videoweb.model.vo.LoginAccountRankVo">
+        <result column="account" property="account"/>
+        <result column="count" property="count"/>
+    </resultMap>
+
+    <select id="selectLoginAccountRank" resultMap="LoginAccountRankMap">
+        SELECT account, COUNT(*) AS count
+        FROM public.login_log
+        WHERE is_delete = 0
+          AND login_time &gt;= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY account
+        ORDER BY count DESC
+        LIMIT 3
+    </select>
+
 </mapper>

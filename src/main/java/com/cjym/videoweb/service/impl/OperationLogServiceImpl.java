@@ -9,14 +9,21 @@ import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.model.dto.OperationLogPageDto;
 import com.cjym.videoweb.model.entity.OperationLog;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.IpRankVo;
 import com.cjym.videoweb.model.vo.LogOverviewVo;
 import com.cjym.videoweb.model.vo.OperationLogDetailVo;
+import com.cjym.videoweb.model.vo.OperationTrendVo;
 import com.cjym.videoweb.service.OperationLogService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 运行日志 Service 实现
@@ -63,6 +70,34 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
     @Override
     public LogOverviewVo getOverview() {
         return baseMapper.selectLogOverview();
+    }
+
+    @Override
+    public List<OperationTrendVo> getOperationTrend() {
+        List<OperationTrendVo> dbList = baseMapper.selectOperationTrend();
+        Map<LocalDate, OperationTrendVo> dateMap = dbList.stream()
+                .collect(Collectors.toMap(OperationTrendVo::getDate, v -> v));
+        // 补全最近7天（含今天），无数据的日期填 0
+        LocalDate today = LocalDate.now();
+        List<OperationTrendVo> result = new ArrayList<>(7);
+        for (int i = 6; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            OperationTrendVo vo = dateMap.get(day);
+            if (vo == null) {
+                vo = new OperationTrendVo();
+                vo.setDate(day);
+                vo.setNormalCount(0L);
+                vo.setBusinessException(0L);
+                vo.setSystemException(0L);
+            }
+            result.add(vo);
+        }
+        return result;
+    }
+
+    @Override
+    public List<IpRankVo> getIpRank() {
+        return baseMapper.selectIpRank();
     }
 
     /**

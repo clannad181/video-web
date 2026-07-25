@@ -4,6 +4,7 @@ package com.cjym.videoweb.handler.exception;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.result.R;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -28,7 +29,8 @@ public class GlobExceptionHandler {
             Exception.class,
             AsyncRequestTimeoutException.class,
             ConnectException.class,
-            NumberFormatException.class
+            NumberFormatException.class,
+            DataAccessException.class
     })
     public R<String> otherException(Exception e){
         log.error("发生错误");

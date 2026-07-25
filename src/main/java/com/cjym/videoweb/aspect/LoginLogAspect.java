@@ -3,6 +3,7 @@ package com.cjym.videoweb.aspect;
 import com.cjym.videoweb.constant.CaptchaConstant;
 import com.cjym.videoweb.model.entity.LoginLog;
 import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.LoginLogService;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
@@ -56,10 +57,12 @@ public class LoginLogAspect {
             loginLogService.recordLoginSuccess(loginLog);
             return result;
         } catch (Throwable e) {
-            // 5. 登录失败 → 记录失败原因并记录日志
+            // 5. 登录失败 → 记录失败原因
             loginLog.setFailReason(extractFailReason(e));
-            loginLogService.recordLoginFailure(loginLog);
-            // 6. 原样抛出异常，不改变原始业务逻辑
+            try {
+                loginLogService.recordLoginFailure(loginLog);
+            } catch (Exception ignored) {}
+            // 6. 原样抛出，保留原始异常类型，确保 GlobExceptionHandler 能精确匹配
             throw e;
         }
     }

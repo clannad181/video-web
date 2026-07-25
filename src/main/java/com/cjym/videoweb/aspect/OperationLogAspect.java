@@ -111,15 +111,19 @@ public class OperationLogAspect {
     public Object aroundGlobExceptionHandler(ProceedingJoinPoint joinPoint) throws Throwable {
         Throwable exception = extractException(joinPoint);
         if (exception != null) {
-            OperationLog operationLog = new OperationLog();
-            fillRequestContext(operationLog, joinPoint, null);
-            // 从原始请求中还原真正的 Controller @Tag/@Operation，而非 GlobExceptionHandler 的
-            resolveOriginalControllerInfo(operationLog, exception);
-            operationLog.setResultStatus(0);
-            operationLog.setLogType(0);
-            operationLog.setErrorMessage(truncate(exception.getMessage(), 2000));
-            operationLog.setErrorStackTrace(truncate(getStackTrace(exception), 5000));
-            operationLogService.saveLog(operationLog);
+            // 日志记录失败不能阻断 GlobExceptionHandler 执行，必须用 try-catch 保护
+            try {
+                OperationLog operationLog = new OperationLog();
+                fillRequestContext(operationLog, joinPoint, null);
+                resolveOriginalControllerInfo(operationLog, exception);
+                operationLog.setResultStatus(0);
+                operationLog.setLogType(0);
+                operationLog.setErrorMessage(truncate(exception.getMessage(), 2000));
+                operationLog.setErrorStackTrace(truncate(getStackTrace(exception), 5000));
+                operationLogService.saveLog(operationLog);
+            } catch (Exception e) {
+                log.error("记录全局异常日志失败，已降级放行", e);
+            }
         }
         return joinPoint.proceed();
     }
