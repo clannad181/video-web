@@ -6,6 +6,8 @@
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="name" property="name" jdbcType="VARCHAR"/>
         <result column="sort" property="sort" jdbcType="INTEGER"/>
+        <result column="is_show" property="isShow" jdbcType="BOOLEAN"/>
+        <result column="is_system" property="isSystem" jdbcType="BOOLEAN"/>
         <result column="status" property="status" jdbcType="BOOLEAN"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
@@ -17,21 +19,36 @@
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="name" property="name" jdbcType="VARCHAR"/>
         <result column="sort" property="sort" jdbcType="INTEGER"/>
+        <result column="is_show" property="isShow" jdbcType="BOOLEAN"/>
+        <result column="is_system" property="isSystem" jdbcType="BOOLEAN"/>
         <result column="status" property="status" jdbcType="BOOLEAN"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
     <select id="selectCategoryPage" resultMap="CategoryPageDtoResultMap">
-        SELECT id, name, sort, status, create_time, update_time
+        SELECT id, name, sort, is_show, is_system, status, create_time, update_time
         FROM public.category
         <where>
             is_delete = 0
             <if test="name != null and name != ''">
                 AND name LIKE CONCAT('%', #{name}, '%')
             </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="isShow != null">
+                AND is_show = #{isShow}
+            </if>
         </where>
-        ORDER BY sort ASC, id ASC
+        <choose>
+            <when test="orderColumn != null and orderColumn != '' and orderDirection != null and orderDirection != ''">
+                ORDER BY ${orderColumn} ${orderDirection}
+            </when>
+            <otherwise>
+                ORDER BY sort ASC, id ASC
+            </otherwise>
+        </choose>
     </select>
 
 </mapper>

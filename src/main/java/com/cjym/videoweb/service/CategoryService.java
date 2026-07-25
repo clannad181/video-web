@@ -14,9 +14,11 @@ import java.util.List;
 public interface CategoryService extends IService<Category> {
 
     /**
-     * 分页查询分类列表（支持按名称模糊搜索）
+     * 分页查询分类列表（支持按名称模糊搜索、状态、是否显示筛选、动态排序）
      */
-    IPage<CategoryPageDto> pageCategory(Integer page, Integer size, String name);
+    IPage<CategoryPageDto> pageCategory(Integer page, Integer size, String name,
+                                        Boolean status, Boolean isShow,
+                                        String field, String descOrAsc);
 
     /**
      * 查询分类详情
@@ -32,6 +34,11 @@ public interface CategoryService extends IService<Category> {
      * 修改分类
      */
     void update(Category category);
+
+    /**
+     * 删除分类（含系统保留分类校验及缓存清除）
+     */
+    void delete(Long id);
 
     /**
      * 获取所有启用中的分类列表（供下拉选择使用）

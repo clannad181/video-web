@@ -19,6 +19,12 @@ public class CategoryVo {
     @Schema(description = "排序")
     private Integer sort;
 
+    @Schema(description = "是否显示")
+    private Boolean isShow;
+
+    @Schema(description = "是否为系统保留分类")
+    private Boolean isSystem;
+
     @Schema(description = "状态（true启用/false禁用）")
     private Boolean status;
 

@@ -23,12 +23,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_REDIS_KEY_PREFIX;
+
 @Service
 @Slf4j
 public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig> implements WebConfigService {
 
     private static final String REDIS_KEY_LIST_ALL = "web_config:list:ALL";
-    private static final String REDIS_KEY_LIST_PREFIX = "web_config:list:";
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -54,7 +55,7 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
                 .forEach((category, list) -> {
                     try {
                         stringRedisTemplate.opsForValue()
-                                .set(REDIS_KEY_LIST_PREFIX + category, objectMapper.writeValueAsString(list));
+                                .set(WEB_CONFIG_REDIS_KEY_PREFIX + category, objectMapper.writeValueAsString(list));
                     } catch (JsonProcessingException ignored) {
                     }
                 });
@@ -64,7 +65,7 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
     @Override
     public R<List<WebConfigVo>> list(String category) {
         String redisKey = StringUtils.isNotEmpty(category)
-                ? REDIS_KEY_LIST_PREFIX + category
+                ? WEB_CONFIG_REDIS_KEY_PREFIX + category
                 : REDIS_KEY_LIST_ALL;
 
         // 1. 尝试从 Redis 读取
@@ -153,7 +154,7 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
      */
     private void clearCache(String category) {
         if (StringUtils.isNotEmpty(category)) {
-            stringRedisTemplate.delete(REDIS_KEY_LIST_PREFIX + category);
+            stringRedisTemplate.delete(WEB_CONFIG_REDIS_KEY_PREFIX + category);
         }
         stringRedisTemplate.delete(REDIS_KEY_LIST_ALL);
     }

@@ -7,9 +7,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.RoleMapper;
+import com.cjym.videoweb.mapper.RoleMenuBindMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.model.dto.RoleDto;
 import com.cjym.videoweb.model.entity.Role;
+import com.cjym.videoweb.model.entity.RoleMenuBind;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.RoleService;
@@ -20,7 +22,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 
 import com.cjym.videoweb.model.vo.RoleOptionVo;
+import com.cjym.videoweb.model.vo.WebConfigVo;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_CATEGORY_DEFAULT;
+import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_KEY_DEFAULT_ROLE;
+import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_REDIS_KEY_PREFIX;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,7 +40,16 @@ import java.util.stream.Collectors;
 public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements RoleService {
 
     @Resource
+    private RoleMenuBindMapper roleMenuBindMapper;
+
+    @Resource
     private UserInfoMapper userInfoMapper;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private ObjectMapper objectMapper;
 
     @Override
     public R<String> addRole(Role role) {
@@ -90,14 +110,56 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         if (operatorLevel != null && role.getLevel() != null && operatorLevel > role.getLevel()) {
             return R.error("无权操作该角色");
         }
-        // 将该角色下的所有用户角色设置为 2（默认角色）
+        // 将该角色下的所有用户角色设置为解析出的默认角色
+        Long defaultRoleId = resolveDefaultRoleId();
         LambdaUpdateWrapper<UserInfo> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(UserInfo::getRoleId, id)
-                     .set(UserInfo::getRoleId, 2L);
+                     .set(UserInfo::getRoleId, defaultRoleId);
         userInfoMapper.update(null, updateWrapper);
+        // 删除该角色的菜单绑定
+        LambdaQueryWrapper<RoleMenuBind> bindWrapper = new LambdaQueryWrapper<>();
+        bindWrapper.eq(RoleMenuBind::getRoleId, id);
+        roleMenuBindMapper.delete(bindWrapper);
         // 删除角色
         baseMapper.deleteById(id);
         return R.success("删除角色成功");
+    }
+
+    /**
+     * 解析默认角色ID
+     * 查找顺序：
+     * 1. 从Redis缓存读取WebConfig中 category=default, key=default_role 的value
+     * 2. 若value为空或未找到，查询Role表中未被删除且sys_def=true的角色，取level最大的
+     * 3. 若仍未找到，返回null
+     */
+    private Long resolveDefaultRoleId() {
+        // Step 1: 从Redis缓存获取WebConfig中default分类的配置
+        String cached = stringRedisTemplate.opsForValue().get(WEB_CONFIG_REDIS_KEY_PREFIX + WEB_CONFIG_CATEGORY_DEFAULT);
+        if (StringUtils.isNotEmpty(cached)) {
+            try {
+                List<WebConfigVo> configList = objectMapper.readValue(cached,
+                        new TypeReference<List<WebConfigVo>>() {});
+                for (WebConfigVo vo : configList) {
+                    if (WEB_CONFIG_KEY_DEFAULT_ROLE.equals(vo.getKey()) && StringUtils.isNotEmpty(vo.getValue())) {
+                        return Long.valueOf(vo.getValue());
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Step 2: 查找未被删除且sys_def=true的角色，取level最大的
+        LambdaQueryWrapper<Role> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Role::getSysDef, true)
+               .orderByDesc(Role::getLevel)
+               .last("LIMIT 1");
+        Role sysDefRole = baseMapper.selectOne(wrapper);
+        if (sysDefRole != null) {
+            return sysDefRole.getId();
+        }
+
+        // Step 3: 未找到任何默认角色
+        return null;
     }
 
     /**

@@ -62,4 +62,14 @@ public class BaseConstant {
     public static final String BACKEND_ACCESS_TOKEN_EXPIRY = "backend_access_token_expiry";
     /** 后台 Refresh Token 有效期配置键 */
     public static final String BACKEND_REFRESH_TOKEN_EXPIRY = "backend_refresh_token_expiry";
+
+    // ==================== WebConfig Redis 缓存 Key 常量 ====================
+    /** WebConfig Redis 缓存 key 前缀 */
+    public static final String WEB_CONFIG_REDIS_KEY_PREFIX = "web_config:list:";
+
+    // ==================== WebConfig 分类与键常量 ====================
+    /** WebConfig 默认分类 */
+    public static final String WEB_CONFIG_CATEGORY_DEFAULT = "default";
+    /** WebConfig 默认角色配置键 */
+    public static final String WEB_CONFIG_KEY_DEFAULT_ROLE = "default_role";
 }

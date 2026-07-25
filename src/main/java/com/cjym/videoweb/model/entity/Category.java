@@ -22,6 +22,12 @@ public class Category {
     @Schema(description = "排序")
     private Integer sort;
 
+    @Schema(description = "是否显示")
+    private Boolean isShow;
+
+    @Schema(description = "是否为系统保留分类（系统保留分类不可删除、不可修改名称）")
+    private Boolean isSystem;
+
     @Schema(description = "状态（true启用/false禁用）")
     private Boolean status;
 

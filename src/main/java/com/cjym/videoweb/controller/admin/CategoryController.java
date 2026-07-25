@@ -25,12 +25,16 @@ public class CategoryController {
     private CategoryService categoryService;
 
     @GetMapping("/list")
-    @Operation(summary = "分页查询分类列表", description = "支持按名称模糊搜索")
+    @Operation(summary = "分页查询分类列表", description = "支持按名称模糊搜索、状态、是否显示筛选、动态排序")
     public R<IPage<CategoryPageDto>> list(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
-            @RequestParam(required = false) String name) {
-        return R.success(categoryService.pageCategory(page, size, name));
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Boolean status,
+            @RequestParam(required = false) Boolean isShow,
+            @RequestParam(required = false) String field,
+            @RequestParam(required = false) String descOrAsc) {
+        return R.success(categoryService.pageCategory(page, size, name, status, isShow, field, descOrAsc));
     }
 
     @GetMapping("/{id}")
@@ -53,18 +57,15 @@ public class CategoryController {
         return R.success("修改成功");
     }
 
-    @PostMapping("/delete/{id}")
-    @Operation(summary = "删除分类", description = "根据ID逻辑删除分类")
+    @GetMapping("/delete/{id}")
+    @Operation(summary = "删除分类", description = "根据ID逻辑删除分类，系统保留分类不可删除")
     public R<String> delete(@PathVariable Long id) {
-        if (id == null) {
-            return R.error("分类ID不能为空");
-        }
-        categoryService.removeById(id);
+        categoryService.delete(id);
         return R.success("删除成功");
     }
 
     @GetMapping("/enabled")
-    @Operation(summary = "获取启用中的分类列表", description = "获取所有启用状态的分类，按排序升序排列，供下拉选择使用")
+    @Operation(summary = "获取显示中的分类列表", description = "获取所有 isShow=true 的分类，按排序升序排列，供下拉选择使用")
     public R<List<CategoryVo>> listEnabled() {
         return R.success(categoryService.listEnabled());
     }

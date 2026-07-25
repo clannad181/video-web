@@ -15,8 +15,12 @@ import org.apache.ibatis.annotations.Param;
 public interface CategoryMapper extends BaseMapper<Category> {
 
     /**
-     * 分页查询分类（支持按名称模糊搜索）
+     * 分页查询分类（支持按名称模糊搜索、状态、是否显示筛选、动态排序）
      */
     IPage<CategoryPageDto> selectCategoryPage(Page<CategoryPageDto> page,
-                                               @Param("name") String name);
+                                               @Param("name") String name,
+                                               @Param("status") Boolean status,
+                                               @Param("isShow") Boolean isShow,
+                                               @Param("orderColumn") String orderColumn,
+                                               @Param("orderDirection") String orderDirection);
 }

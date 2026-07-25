@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.VideoMapper">
+
+    <resultMap id="BaseResultMap" type="com.cjym.videoweb.model.entity.Video">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="title" property="title" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
+        <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
+        <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
+        <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
+        <result column="play_count" property="playCount" jdbcType="BIGINT"/>
+        <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
+        <result column="like_count" property="likeCount" jdbcType="BIGINT"/>
+        <result column="coin_count" property="coinCount" jdbcType="BIGINT"/>
+        <result column="viewer_count" property="viewerCount" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="user_name" property="userName" jdbcType="VARCHAR"/>
+        <result column="nick_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="tags" property="tags" jdbcType="VARCHAR"/>
+        <result column="review_status" property="reviewStatus" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <resultMap id="VideoPageDtoResultMap" type="com.cjym.videoweb.model.dto.VideoPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="title" property="title" jdbcType="VARCHAR"/>
+        <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
+        <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
+        <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
+        <result column="play_count" property="playCount" jdbcType="BIGINT"/>
+        <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
+        <result column="category_name" property="categoryName" jdbcType="VARCHAR"/>
+        <result column="nick_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="review_status" property="reviewStatus" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="selectVideoPage" resultMap="VideoPageDtoResultMap">
+        SELECT v.id, v.title, v.cover_url, v.total_duration, v.episode_count,
+               v.play_count, v.favorite_count, v.nick_name, v.review_status, v.create_time,
+               c.name AS category_name
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        <where>
+            v.is_delete = 0
+            <if test="title != null and title != ''">
+                AND v.title LIKE CONCAT('%', #{title}, '%')
+            </if>
+            <if test="categoryId != null">
+                AND v.category_id = #{categoryId}
+            </if>
+            <if test="reviewStatus != null">
+                AND v.review_status = #{reviewStatus}
+            </if>
+            <if test="userId != null">
+                AND v.user_id = #{userId}
+            </if>
+        </where>
+        ORDER BY v.create_time DESC
+    </select>
+
+</mapper>
