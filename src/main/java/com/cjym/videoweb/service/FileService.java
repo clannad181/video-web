@@ -6,6 +6,7 @@ import com.cjym.videoweb.model.vo.FileCheckResultVo;
 import com.cjym.videoweb.model.vo.FileCheckVo;
 import com.cjym.videoweb.model.vo.FileResultVo;
 import com.cjym.videoweb.result.R;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,5 +22,5 @@ public interface FileService extends IService<FileInfo> {
 
     void downloadFile(Long fileId, HttpServletResponse response);
 
-    void previewFile(String filePath, HttpServletResponse response);
+    void previewFile(String filePath, HttpServletRequest request, HttpServletResponse response);
 }

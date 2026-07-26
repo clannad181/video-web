@@ -16,6 +16,9 @@ public class UserInfo{
     @Schema(description = "用户名")
     private String userName;
 
+    @Schema(description = "用户唯一标识uid（16位随机数字）")
+    private String uid;
+
     @Schema(description = "用户密码")
     private String password;
 

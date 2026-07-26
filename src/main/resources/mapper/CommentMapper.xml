@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.CommentMapper">
+
+    <resultMap id="CommentVoResultMap" type="com.cjym.videoweb.model.vo.CommentVo">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="video_id" property="videoId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
+        <result column="parent_id" property="parentId" jdbcType="BIGINT"/>
+        <result column="root_id" property="rootId" jdbcType="BIGINT"/>
+        <result column="content" property="content" jdbcType="VARCHAR"/>
+        <result column="like_count" property="likeCount" jdbcType="INTEGER"/>
+        <result column="reply_count" property="replyCount" jdbcType="INTEGER"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="liked" property="liked" jdbcType="BOOLEAN"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 分页查询视频一级评论 -->
+    <select id="selectRootComments" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               <if test="currentUserId != null">
+                   (CASE WHEN cl.status = 1 THEN TRUE ELSE FALSE END) AS liked
+               </if>
+               <if test="currentUserId == null">
+                   FALSE AS liked
+               </if>
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        <if test="currentUserId != null">
+            LEFT JOIN public.comment_like cl ON c.id = cl.comment_id AND cl.user_id = #{currentUserId}
+        </if>
+        WHERE c.video_id = #{videoId}
+          AND c.parent_id = 0
+          AND c.status != 2
+        <choose>
+            <when test="sortBy == 'like'">
+                ORDER BY c.like_count DESC, c.create_time DESC
+            </when>
+            <otherwise>
+                ORDER BY c.create_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 查询某根评论的所有子回复 -->
+    <select id="selectReplies" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               <if test="currentUserId != null">
+                   (CASE WHEN cl.status = 1 THEN TRUE ELSE FALSE END) AS liked
+               </if>
+               <if test="currentUserId == null">
+                   FALSE AS liked
+               </if>
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        <if test="currentUserId != null">
+            LEFT JOIN public.comment_like cl ON c.id = cl.comment_id AND cl.user_id = #{currentUserId}
+        </if>
+        WHERE c.root_id = #{rootId}
+          AND c.parent_id != 0
+          AND c.status != 2
+        ORDER BY c.create_time ASC
+    </select>
+
+</mapper>

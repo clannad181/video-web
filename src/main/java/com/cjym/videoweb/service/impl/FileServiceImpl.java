@@ -11,6 +11,7 @@ import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.FileService;
 import cn.hutool.crypto.digest.DigestUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -98,6 +99,7 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
                 fileInfo.setTotalChunks(fileCheckVo.getTotalChunks());
                 fileInfo.setChunkSize(fileCheckVo.getChunkSize());
                 fileInfo.setCategory(fileCheckVo.getCategory() != null ? fileCheckVo.getCategory() : "document");
+                fileInfo.setFilePath("");
                 fileInfo.setStatus(0);
                 baseMapper.insert(fileInfo);
             }
@@ -324,22 +326,67 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
     }
 
     @Override
-    public void previewFile(String filePath, HttpServletResponse response) {
+    public void previewFile(String filePath, HttpServletRequest request, HttpServletResponse response) {
         File file = new File(uploadPath + File.separator + filePath);
         if (!file.exists()) {
             throw new RuntimeException("文件不存在");
         }
+
+        String contentType = getContentType(filePath);
+        long fileLength = file.length();
+        String rangeHeader = request.getHeader("Range");
+
+        response.setContentType(contentType);
+        response.setHeader("Accept-Ranges", "bytes");
+
         try {
-            response.setContentType(getContentType(filePath));
-            response.setHeader("Content-Length", String.valueOf(file.length()));
-            try (FileInputStream fis = new FileInputStream(file);
-                 OutputStream os = response.getOutputStream()) {
-                byte[] buffer = new byte[8192];
-                int len;
-                while ((len = fis.read(buffer)) != -1) {
-                    os.write(buffer, 0, len);
+            if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                // 解析 Range: "bytes=0-1023" or "bytes=1024-"
+                String rangeValue = rangeHeader.substring("bytes=".length());
+                String[] parts = rangeValue.split("-");
+                long start = parts[0].isEmpty() ? 0 : Long.parseLong(parts[0]);
+                long end = (parts.length > 1 && !parts[1].isEmpty())
+                        ? Long.parseLong(parts[1])
+                        : fileLength - 1;
+
+                // 校验 range 合法性
+                if (start >= fileLength) {
+                    response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+                    response.setHeader("Content-Range", "bytes */" + fileLength);
+                    return;
                 }
-                os.flush();
+                end = Math.min(end, fileLength - 1);
+                long contentLength = end - start + 1;
+
+                // 206 Partial Content
+                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+                response.setHeader("Content-Length", String.valueOf(contentLength));
+                response.setHeader("Content-Range", "bytes " + start + "-" + end + "/" + fileLength);
+
+                try (RandomAccessFile raf = new RandomAccessFile(file, "r");
+                     OutputStream os = response.getOutputStream()) {
+                    raf.seek(start);
+                    byte[] buffer = new byte[8192];
+                    long remaining = contentLength;
+                    int len;
+                    while (remaining > 0 && (len = raf.read(buffer, 0, (int) Math.min(buffer.length, remaining))) != -1) {
+                        os.write(buffer, 0, len);
+                        remaining -= len;
+                    }
+                    os.flush();
+                }
+            } else {
+                // 完整文件返回 200
+                response.setHeader("Content-Length", String.valueOf(fileLength));
+                try (FileInputStream fis = new FileInputStream(file);
+                     OutputStream os = response.getOutputStream()) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = fis.read(buffer)) != -1) {
+                        os.write(buffer, 0, len);
+                    }
+                    os.flush();
+                }
             }
         } catch (IOException e) {
             throw new RuntimeException("文件预览失败: " + e.getMessage());
@@ -358,15 +405,32 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
     private String getContentType(String filePath) {
         String ext = getFileExtension(filePath).toLowerCase();
         return switch (ext) {
+            // 图片
             case ".jpg", ".jpeg" -> "image/jpeg";
             case ".png" -> "image/png";
             case ".gif" -> "image/gif";
             case ".webp" -> "image/webp";
             case ".svg" -> "image/svg+xml";
+            case ".bmp" -> "image/bmp";
+            // 视频
             case ".mp4" -> "video/mp4";
             case ".webm" -> "video/webm";
+            case ".ogg" -> "video/ogg";  // 也常包含音频流
+            case ".avi" -> "video/x-msvideo";
+            case ".mov" -> "video/quicktime";
+            case ".flv" -> "video/x-flv";
+            case ".mkv" -> "video/x-matroska";
+            case ".m4v" -> "video/x-m4v";
+            case ".wmv" -> "video/x-ms-wmv";
+            case ".3gp" -> "video/3gpp";
+            case ".ts" -> "video/mp2t";
+            // 音频
             case ".mp3" -> "audio/mpeg";
             case ".wav" -> "audio/wav";
+            case ".flac" -> "audio/flac";
+            case ".aac" -> "audio/aac";
+            case ".wma" -> "audio/x-ms-wma";
+            // 文档
             case ".pdf" -> "application/pdf";
             case ".json" -> "application/json";
             case ".xml" -> "application/xml";

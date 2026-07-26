@@ -8,6 +8,7 @@ import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.CategoryMapper;
 import com.cjym.videoweb.model.dto.CategoryPageDto;
 import com.cjym.videoweb.model.entity.Category;
+import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryVo;
 import com.cjym.videoweb.service.CategoryService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -61,7 +62,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     @PostConstruct
     public void initCache() {
         log.info("初始化缓存分类列表");
-        List<CategoryVo> list = loadEnabledFromDb();
+        List<CategorySimpleVo> list = loadEnabledFromDb();
         try {
             stringRedisTemplate.opsForValue().set(REDIS_KEY_LIST_ENABLED,
                     objectMapper.writeValueAsString(list));
@@ -187,19 +188,19 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     }
 
     @Override
-    public List<CategoryVo> listEnabled() {
+    public List<CategorySimpleVo> listEnabled() {
         // 1. 尝试从 Redis 读取
         String cached = stringRedisTemplate.opsForValue().get(REDIS_KEY_LIST_ENABLED);
         if (cached != null && !cached.isEmpty()) {
             try {
-                return objectMapper.readValue(cached, new TypeReference<List<CategoryVo>>() {});
+                return objectMapper.readValue(cached, new TypeReference<List<CategorySimpleVo>>() {});
             } catch (JsonProcessingException e) {
                 // 缓存数据异常，回源数据库
             }
         }
 
         // 2. Redis 未命中或异常，查数据库
-        List<CategoryVo> voList = loadEnabledFromDb();
+        List<CategorySimpleVo> voList = loadEnabledFromDb();
 
         // 3. 回写 Redis
         try {
@@ -214,16 +215,17 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     /**
      * 从数据库加载启用中的分类列表（不查缓存）
      */
-    private List<CategoryVo> loadEnabledFromDb() {
+    private List<CategorySimpleVo> loadEnabledFromDb() {
         List<Category> list = baseMapper.selectList(
                 new LambdaQueryWrapper<Category>()
-                        .eq(Category::getIsShow, true)
                         .eq(Category::getStatus, true)
                         .orderByAsc(Category::getSort, Category::getId)
         );
         return list.stream().map(e -> {
-            CategoryVo vo = new CategoryVo();
-            BeanUtils.copyProperties(e, vo);
+            CategorySimpleVo vo = new CategorySimpleVo();
+            vo.setId(e.getId());
+            vo.setName(e.getName());
+            vo.setSort(e.getSort());
             return vo;
         }).collect(Collectors.toList());
     }

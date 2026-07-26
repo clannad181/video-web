@@ -24,4 +24,22 @@ public class VideoEpisodeVo {
 
     @Schema(description = "排序")
     private Integer sort;
+
+    @Schema(description = "审核状态：0-待审核，1-审核通过，2-审核拒绝")
+    private Integer reviewStatus;
+
+    @Schema(description = "播放数")
+    private Long playCount;
+
+    @Schema(description = "收藏数")
+    private Long favoriteCount;
+
+    @Schema(description = "点赞数")
+    private Long likeCount;
+
+    @Schema(description = "投币数")
+    private Long coinCount;
+
+    @Schema(description = "观看人数")
+    private Long viewerCount;
 }

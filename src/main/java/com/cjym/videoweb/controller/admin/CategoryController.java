@@ -3,6 +3,7 @@ package com.cjym.videoweb.controller.admin;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.CategoryPageDto;
 import com.cjym.videoweb.model.entity.Category;
+import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CategoryService;
@@ -65,8 +66,8 @@ public class CategoryController {
     }
 
     @GetMapping("/enabled")
-    @Operation(summary = "获取显示中的分类列表", description = "获取所有 isShow=true 的分类，按排序升序排列，供下拉选择使用")
-    public R<List<CategoryVo>> listEnabled() {
+    @Operation(summary = "获取启用中的分类列表", description = "获取所有 status=true 的分类，仅返回id/name/sort，按排序升序排列，供下拉选择使用")
+    public R<List<CategorySimpleVo>> listEnabled() {
         return R.success(categoryService.listEnabled());
     }
 }

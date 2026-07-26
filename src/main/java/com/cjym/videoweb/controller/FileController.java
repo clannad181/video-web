@@ -66,19 +66,16 @@ public class FileController {
     @GetMapping("/preview/**")
     @Operation(summary = "文件预览", description = "根据文件路径预览文件（支持图片、视频等）")
     public void previewFile(HttpServletResponse response) {
-        // 从请求路径中提取 /file/preview/ 后的部分作为文件路径
-        // Spring 无法直接获取 ** 的值，需要在方法中手动解析
         previewFileInternal(response);
     }
 
     private void previewFileInternal(HttpServletResponse response) {
-        // 这里使用 RequestContextHolder 获取请求路径（简化处理）
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
         String requestUri = request.getRequestURI();
         String prefix = "/api/file/preview/";
         if (requestUri.startsWith(prefix)) {
             String filePath = requestUri.substring(prefix.length());
-            fileService.previewFile(filePath, response);
+            fileService.previewFile(filePath, request, response);
         }
     }
 }

@@ -2,10 +2,13 @@ package com.cjym.videoweb.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Video;
+import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
+import com.cjym.videoweb.result.R;
 
 public interface VideoService extends IService<Video> {
 
@@ -13,7 +16,8 @@ public interface VideoService extends IService<Video> {
      * 分页查询视频列表
      */
     IPage<VideoPageDto> pageVideo(Integer page, Integer size, String title,
-                                   Long categoryId, Integer reviewStatus, Long userId);
+                                   Long categoryId, Integer reviewStatus, String nickName, String uid,
+                                   Integer field, String descOrAsc,Boolean isOngoing);
 
     /**
      * 查询视频详情（含剧集和标签）
@@ -21,12 +25,12 @@ public interface VideoService extends IService<Video> {
     VideoVo getDetailById(Long id);
 
     /**
-     * 新增视频（含剧集和标签）
+     * 新增视频
      */
     void add(VideoSaveDto dto);
 
     /**
-     * 编辑视频（含剧集和标签）
+     * 编辑视频
      */
     void update(VideoSaveDto dto);
 
@@ -36,7 +40,23 @@ public interface VideoService extends IService<Video> {
     void delete(Long id);
 
     /**
-     * 更新审核状态
+     * 批量保存剧集（增量更新：区分新增/更新/删除）
+     *
+     * @return
      */
-    void updateReviewStatus(Long id, Integer reviewStatus);
+    R<String> saveEpisodes(VideoEpisodeSaveBatchDto dto);
+
+    /**
+     * 审核剧集
+     */
+    void updateReviewStatus(Long episodeId, Integer reviewStatus);
+    /**
+     * 删除剧集
+     */
+    void deleteEpisode(Long episodeId);
+
+    /**
+     * 查询视频审核状态统计（按视频级聚合审核状态分组计数）
+     */
+    VideoReviewStatsVo getReviewStats();
 }

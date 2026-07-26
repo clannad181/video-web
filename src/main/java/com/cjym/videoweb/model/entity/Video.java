@@ -34,35 +34,17 @@ public class Video {
     @Schema(description = "总集数")
     private Integer episodeCount;
 
-    @Schema(description = "播放数")
-    private Long playCount;
-
-    @Schema(description = "收藏数")
-    private Long favoriteCount;
-
-    @Schema(description = "点赞数")
-    private Long likeCount;
-
-    @Schema(description = "投币数")
-    private Long coinCount;
-
-    @Schema(description = "观看人数")
-    private Long viewerCount;
-
     @Schema(description = "UP主用户id")
     private Long userId;
-
-    @Schema(description = "UP主用户名")
-    private String userName;
-
-    @Schema(description = "UP主昵称")
-    private String nickName;
 
     @Schema(description = "标签，多个以逗号分隔")
     private String tags;
 
-    @Schema(description = "审核状态：0-待审核，1-审核通过，2-审核拒绝")
-    private Integer reviewStatus;
+    @Schema(description = "是否连载中")
+    private Boolean isOngoing;
+
+    @Schema(description = "视频状态：0-草稿，1-待发布，2-已发布，3-已下架")
+    private Integer videoStatus;
 
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")

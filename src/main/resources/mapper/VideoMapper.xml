@@ -10,16 +10,10 @@
         <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
         <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
         <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
-        <result column="play_count" property="playCount" jdbcType="BIGINT"/>
-        <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
-        <result column="like_count" property="likeCount" jdbcType="BIGINT"/>
-        <result column="coin_count" property="coinCount" jdbcType="BIGINT"/>
-        <result column="viewer_count" property="viewerCount" jdbcType="BIGINT"/>
         <result column="user_id" property="userId" jdbcType="BIGINT"/>
-        <result column="user_name" property="userName" jdbcType="VARCHAR"/>
-        <result column="nick_name" property="nickName" jdbcType="VARCHAR"/>
         <result column="tags" property="tags" jdbcType="VARCHAR"/>
-        <result column="review_status" property="reviewStatus" jdbcType="INTEGER"/>
+        <result column="is_ongoing" property="isOngoing" jdbcType="BOOLEAN"/>
+        <result column="video_status" property="videoStatus" jdbcType="INTEGER"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
         <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
@@ -34,17 +28,31 @@
         <result column="play_count" property="playCount" jdbcType="BIGINT"/>
         <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
         <result column="category_name" property="categoryName" jdbcType="VARCHAR"/>
-        <result column="nick_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatarUrl" jdbcType="VARCHAR"/>
+        <result column="uid" property="uid" jdbcType="VARCHAR"/>
+        <result column="is_ongoing" property="isOngoing" jdbcType="BOOLEAN"/>
+        <result column="video_status" property="videoStatus" jdbcType="INTEGER"/>
         <result column="review_status" property="reviewStatus" jdbcType="INTEGER"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
     <select id="selectVideoPage" resultMap="VideoPageDtoResultMap">
         SELECT v.id, v.title, v.cover_url, v.total_duration, v.episode_count,
-               v.play_count, v.favorite_count, v.nick_name, v.review_status, v.create_time,
-               c.name AS category_name
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               v.is_ongoing, v.video_status, v.create_time,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid,
+               (SELECT CASE
+                   WHEN COUNT(*) = 0 THEN 0
+                   WHEN SUM(CASE WHEN e.review_status = 0 THEN 1 ELSE 0 END) = COUNT(*) THEN 0
+                   WHEN SUM(CASE WHEN e.review_status = 0 THEN 1 ELSE 0 END) > 0 THEN 1
+                   ELSE 2
+               END FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0) AS review_status
         FROM public.video_info v
         LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
         <where>
             v.is_delete = 0
             <if test="title != null and title != ''">
@@ -54,13 +62,97 @@
                 AND v.category_id = #{categoryId}
             </if>
             <if test="reviewStatus != null">
-                AND v.review_status = #{reviewStatus}
+                AND EXISTS (
+                    SELECT 1 FROM public.video_episode e
+                    WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = #{reviewStatus}
+                )
             </if>
-            <if test="userId != null">
-                AND v.user_id = #{userId}
+            <if test="nickName != null and nickName != ''">
+                AND u.nike_name LIKE CONCAT('%', #{nickName}, '%')
+            </if>
+            <if test="isOngoing != null">
+                AND v.is_ongoing = #{isOngoing}
+            </if>
+            <if test="uid != null and uid != ''">
+                AND u.uid LIKE CONCAT('%', #{uid}, '%')
             </if>
         </where>
-        ORDER BY v.create_time DESC
+        <choose>
+            <when test="orderColumn != null and orderColumn != '' and orderDirection != null and orderDirection != ''">
+                ORDER BY ${orderColumn} ${orderDirection}
+            </when>
+            <otherwise>
+                ORDER BY v.create_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <resultMap id="VideoDetailResultMap" type="com.cjym.videoweb.model.vo.VideoVo">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="title" property="title" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
+        <result column="category_name" property="categoryName" jdbcType="VARCHAR"/>
+        <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
+        <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
+        <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
+        <result column="play_count" property="playCount" jdbcType="BIGINT"/>
+        <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
+        <result column="like_count" property="likeCount" jdbcType="BIGINT"/>
+        <result column="coin_count" property="coinCount" jdbcType="BIGINT"/>
+        <result column="viewer_count" property="viewerCount" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="user_name" property="userName" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatarUrl" jdbcType="VARCHAR"/>
+        <result column="uid" property="uid" jdbcType="VARCHAR"/>
+        <result column="is_ongoing" property="isOngoing" jdbcType="BOOLEAN"/>
+        <result column="video_status" property="videoStatus" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="selectDetailById" resultMap="VideoDetailResultMap">
+        SELECT v.id, v.title, v.description, v.category_id, v.cover_url,
+               v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               COALESCE((SELECT SUM(e.like_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS like_count,
+               COALESCE((SELECT SUM(e.coin_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS coin_count,
+               COALESCE((SELECT SUM(e.viewer_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS viewer_count,
+               v.user_id, v.is_ongoing, v.video_status, v.create_time, v.update_time,
+               c.name AS category_name,
+               u.user_name, u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.id = #{id} AND v.is_delete = 0
+    </select>
+
+    <!-- ==================== 审核状态统计 ==================== -->
+
+    <resultMap id="ReviewStatsResultMap" type="com.cjym.videoweb.model.vo.VideoReviewStatsVo">
+        <result column="pending_count" property="pendingCount" jdbcType="BIGINT"/>
+        <result column="partial_count" property="partialCount" jdbcType="BIGINT"/>
+        <result column="completed_count" property="completedCount" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <select id="selectReviewStats" resultMap="ReviewStatsResultMap">
+        SELECT
+            COALESCE(SUM(CASE WHEN vs = 0 THEN 1 ELSE 0 END), 0) AS pending_count,
+            COALESCE(SUM(CASE WHEN vs = 1 THEN 1 ELSE 0 END), 0) AS partial_count,
+            COALESCE(SUM(CASE WHEN vs = 2 THEN 1 ELSE 0 END), 0) AS completed_count
+        FROM (
+            SELECT v.id,
+                (SELECT CASE
+                    WHEN COUNT(*) = 0 THEN 0
+                    WHEN SUM(CASE WHEN e.review_status = 0 THEN 1 ELSE 0 END) = COUNT(*) THEN 0
+                    WHEN SUM(CASE WHEN e.review_status = 0 THEN 1 ELSE 0 END) > 0 THEN 1
+                    ELSE 2
+                END FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0) AS vs
+            FROM public.video_info v
+            WHERE v.is_delete = 0
+        ) t
     </select>
 
 </mapper>

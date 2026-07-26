@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.CategoryPageDto;
 import com.cjym.videoweb.model.entity.Category;
+import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryVo;
 
 import java.util.List;
@@ -41,7 +42,7 @@ public interface CategoryService extends IService<Category> {
     void delete(Long id);
 
     /**
-     * 获取所有启用中的分类列表（供下拉选择使用）
+     * 获取所有启用中的分类列表（仅返回id/name/sort，供下拉选择使用）
      */
-    List<CategoryVo> listEnabled();
+    List<CategorySimpleVo> listEnabled();
 }

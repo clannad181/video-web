@@ -13,6 +13,9 @@ public class UserPageDto {
     @Schema(description = "主键id")
     private Long id;
 
+    @Schema(description = "用户唯一标识uid")
+    private String uid;
+
     @Schema(description = "用户名")
     private String userName;
 

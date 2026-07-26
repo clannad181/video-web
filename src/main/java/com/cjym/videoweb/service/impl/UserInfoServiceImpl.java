@@ -50,6 +50,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -288,6 +289,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         // 构建用户实体
         UserInfo userInfo = new UserInfo();
         BeanUtils.copyProperties(userAddVo, userInfo);
+        // 生成16位随机数字uid
+        userInfo.setUid(generateUid());
         // 生成盐值并加密密码
         String salt = MD5Util.generateSalt();
         String encryptedPassword = MD5Util.md5WithSalt(userAddVo.getPassword(), salt);
@@ -344,6 +347,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
             wrapper.set(UserInfo::getDescript, userUpdateVo.getDescript());
         }
         baseMapper.update(null, wrapper);
+
         return R.success("更新用户成功");
     }
 
@@ -437,5 +441,16 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
         // 删除 token 本身
         stringRedisTemplate.delete(key);
+    }
+
+    /**
+     * 生成16位随机数字uid
+     */
+    private String generateUid() {
+        StringBuilder sb = new StringBuilder(16);
+        for (int i = 0; i < 16; i++) {
+            sb.append(ThreadLocalRandom.current().nextInt(10));
+        }
+        return sb.toString();
     }
 }

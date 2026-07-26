@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS public.user_info (
     id          BIGSERIAL       PRIMARY KEY,
     user_name   VARCHAR(64)     NOT NULL,
+    uid         VARCHAR(16)     NOT NULL,
     password    VARCHAR(256)    NOT NULL,
     email       VARCHAR(128),
     is_vip      BOOLEAN         DEFAULT FALSE,
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.user_info (
 COMMENT ON TABLE  public.user_info IS '用户信息表';
 COMMENT ON COLUMN public.user_info.id          IS '主键id';
 COMMENT ON COLUMN public.user_info.user_name   IS '用户名';
+COMMENT ON COLUMN public.user_info.uid         IS '用户唯一标识uid（16位随机数字，新增时自动生成）';
 COMMENT ON COLUMN public.user_info.password    IS '用户密码';
 COMMENT ON COLUMN public.user_info.email       IS '用户邮箱';
 COMMENT ON COLUMN public.user_info.is_vip      IS '是否为大会员';

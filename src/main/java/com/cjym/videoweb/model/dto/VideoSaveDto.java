@@ -24,9 +24,15 @@ public class VideoSaveDto {
     @Schema(description = "封面图URL")
     private String coverUrl;
 
+    @Schema(description = "UP主用户id（新增时必填）")
+    private Long userId;
+
+    @Schema(description = "是否连载中")
+    private Boolean isOngoing;
+
+    @Schema(description = "视频状态：0-草稿，1-待发布，2-已发布，3-已下架")
+    private Integer videoStatus;
+
     @Schema(description = "标签列表")
     private List<String> tags;
-
-    @Schema(description = "剧集列表")
-    private List<VideoEpisodeSaveDto> episodes;
 }
