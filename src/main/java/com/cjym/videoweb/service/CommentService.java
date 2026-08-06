@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 
@@ -54,4 +55,20 @@ public interface CommentService extends IService<Comment> {
      * 评论状态统计：按 status 分组计数
      */
     CommentStatusStatsVo getStatusStats();
+
+    /**
+     * 分页查询待审核评论（status=3），支持按评论内容、用户昵称、视频标题筛选
+     */
+    IPage<CommentVo> pageReviewList(Integer page, Integer size,
+                                     String content, String nickName, String videoTitle);
+
+    /**
+     * 审核评论：通过 → status=0，拒绝 → status=2
+     */
+    void review(Long commentId, Integer reviewStatus);
+
+    /**
+     * 评论每日增量：最近7天每天新增评论数（无数据的日期补0）
+     */
+    List<DailyIncrementVo> getDailyIncrement();
 }

@@ -8,6 +8,8 @@ public class CommentConstant {
     public static final int STATUS_USER_DELETED = 1;
     /** 评论状态：运营屏蔽 */
     public static final int STATUS_ADMIN_BLOCKED = 2;
+    /** 评论状态：待审核 */
+    public static final int STATUS_PENDING_REVIEW = 3;
 
     /** 点赞状态：已点赞 */
     public static final int LIKE_ACTIVE = 1;

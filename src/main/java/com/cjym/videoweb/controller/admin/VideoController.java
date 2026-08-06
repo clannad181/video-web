@@ -74,8 +74,18 @@ public class VideoController {
     @PostMapping("/review")
     @Operation(summary = "审核剧集", description = "审核单个剧集：0-待审核，1-审核通过，2-审核拒绝")
     public R<String> review(@RequestBody VideoEpisode episode) {
-        videoService.updateReviewStatus(episode.getId(), episode.getReviewStatus());
-        return R.success("审核操作成功");
+         videoService.updateReviewStatus(episode.getId(), episode.getReviewStatus());
+       return R.success("审核操作成功");
+    }
+
+    @GetMapping("/review-list")
+    @Operation(summary = "分页查询待审核视频", description = "查询待发布(videoStatus=1)且视频级审核状态为未审核或部分审核的视频，支持按标题和UP主昵称模糊搜索")
+    public R<IPage<VideoPageDto>> reviewList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String nickName) {
+        return R.success(videoService.pageReview(page, size, title, nickName));
     }
 
     @GetMapping("/episode/delete/{id}")
@@ -127,3 +137,4 @@ public class VideoController {
         return R.success(vo);
     }
 }
+

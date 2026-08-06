@@ -37,7 +37,7 @@ public class Comment {
     @Schema(description = "直接子评论数冗余")
     private Integer replyCount;
 
-    @Schema(description = "0-正常，1-用户删除，2-运营屏蔽")
+    @Schema(description = "0-正常，1-用户删除，2-运营屏蔽，3-待审核")
     private Integer status;
 
     @Schema(description = "创建时间")

@@ -22,7 +22,7 @@ COMMENT ON COLUMN public.comment.root_id     IS '根评论ID，一级评论root_
 COMMENT ON COLUMN public.comment.content     IS '评论正文';
 COMMENT ON COLUMN public.comment.like_count  IS '点赞数冗余';
 COMMENT ON COLUMN public.comment.reply_count IS '直接子评论数冗余';
-COMMENT ON COLUMN public.comment.status      IS '0-正常，1-用户删除，2-运营屏蔽';
+COMMENT ON COLUMN public.comment.status      IS '0-正常，1-用户删除，2-运营屏蔽，3-待审核';
 COMMENT ON COLUMN public.comment.create_time IS '创建时间';
 COMMENT ON COLUMN public.comment.update_time IS '更新时间';
 

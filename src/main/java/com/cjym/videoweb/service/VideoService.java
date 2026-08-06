@@ -8,6 +8,7 @@ import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.result.R;
@@ -78,4 +79,14 @@ public interface VideoService extends IService<Video> {
      * 根据剧集 avid 跳转指定集数（返回剧集+视频基本信息）
      */
     VideoEpisodeVo getEpisodeByAvid(String avid);
+
+    /**
+     * 分页查询待审核视频（video_status=1 且 review_status=0 或 1），支持按标题和UP主昵称筛选
+     */
+    IPage<VideoPageDto> pageReview(Integer page, Integer size, String title, String nickName);
+
+    /**
+     * 视频每日增量：最近7天每天新增视频数（无数据的日期补0）
+     */
+    List<DailyIncrementVo> getDailyIncrement();
 }

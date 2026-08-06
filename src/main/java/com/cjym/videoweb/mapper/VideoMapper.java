@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.entity.Video;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Map;
 
 @Mapper
@@ -50,4 +52,16 @@ public interface VideoMapper extends BaseMapper<Video> {
      */
     @MapKey("category_id")
     Map<Long, Map<String, Object>> selectCategoryStats();
+
+    /**
+     * 分页查询待审核视频（video_status = 1 且 review_status = 0 或 1），支持按标题和UP主昵称模糊搜索
+     */
+    IPage<VideoPageDto> selectReviewPage(Page<VideoPageDto> page,
+                                          @Param("title") String title,
+                                          @Param("nickName") String nickName);
+
+    /**
+     * 视频每日增量：最近7天每天新增视频数（按 create_time 日期分组）
+     */
+    List<DailyIncrementVo> selectDailyIncrement();
 }

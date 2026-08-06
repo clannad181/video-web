@@ -13,6 +13,7 @@ import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import com.cjym.videoweb.service.CommentService;
@@ -25,7 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.time.LocalDate;
 
 @Service
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements CommentService {
@@ -192,6 +197,53 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     @Override
     public CommentStatusStatsVo getStatusStats() {
         return baseMapper.selectStatusStats();
+    }
+
+    @Override
+    public IPage<CommentVo> pageReviewList(Integer page, Integer size,
+                                            String content, String nickName, String videoTitle) {
+        Page<CommentVo> pageParam = new Page<>(page, size);
+        return baseMapper.selectReviewList(pageParam, content, nickName, videoTitle);
+    }
+
+    @Override
+    public void review(Long commentId, Integer reviewStatus) {
+        if (commentId == null) {
+            throw new GlobeException("评论ID不能为空");
+        }
+        if (reviewStatus == null || (reviewStatus != CommentConstant.STATUS_NORMAL
+                && reviewStatus != CommentConstant.STATUS_ADMIN_BLOCKED)) {
+            throw new GlobeException("审核状态无效，仅允许 0(通过) 或 2(拒绝)");
+        }
+        Comment comment = baseMapper.selectById(commentId);
+        if (comment == null) {
+            throw new GlobeException("评论不存在");
+        }
+        if (!comment.getStatus().equals(CommentConstant.STATUS_PENDING_REVIEW)) {
+            throw new GlobeException("仅待审核状态的评论才能进行审核操作");
+        }
+        comment.setStatus(reviewStatus);
+        baseMapper.updateById(comment);
+    }
+
+    @Override
+    public List<DailyIncrementVo> getDailyIncrement() {
+        List<DailyIncrementVo> dbList = baseMapper.selectDailyIncrement();
+        Map<LocalDate, DailyIncrementVo> dateMap = dbList.stream()
+                .collect(Collectors.toMap(DailyIncrementVo::getDate, v -> v));
+        LocalDate today = LocalDate.now();
+        List<DailyIncrementVo> result = new ArrayList<>(7);
+        for (int i = 6; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            DailyIncrementVo vo = dateMap.get(day);
+            if (vo == null) {
+                vo = new DailyIncrementVo();
+                vo.setDate(day);
+                vo.setCommentCount(0L);
+            }
+            result.add(vo);
+        }
+        return result;
     }
 
     // ==================== 私有方法 ====================

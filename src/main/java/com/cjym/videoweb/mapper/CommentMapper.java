@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.entity.Comment;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import org.apache.ibatis.annotations.Mapper;
@@ -43,4 +44,17 @@ public interface CommentMapper extends BaseMapper<Comment> {
      * 评论状态统计：按 status 分组计数
      */
     CommentStatusStatsVo selectStatusStats();
+
+    /**
+     * 分页查询待审核评论（status=3），支持按评论内容、用户昵称、视频标题筛选
+     */
+    IPage<CommentVo> selectReviewList(Page<CommentVo> page,
+                                       @Param("content") String content,
+                                       @Param("nickName") String nickName,
+                                       @Param("videoTitle") String videoTitle);
+
+    /**
+     * 评论每日增量：最近7天每天新增评论数（按 create_time 日期分组）
+     */
+    List<DailyIncrementVo> selectDailyIncrement();
 }

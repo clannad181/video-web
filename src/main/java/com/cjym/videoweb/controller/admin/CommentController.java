@@ -1,6 +1,7 @@
 package com.cjym.videoweb.controller.admin;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cjym.videoweb.model.dto.CommentReviewDto;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
@@ -82,5 +83,23 @@ public class CommentController {
     @Operation(summary = "评论状态统计", description = "统计各状态评论数量：正常、用户删除、运营屏蔽及总数")
     public R<CommentStatusStatsVo> statusStats() {
         return R.success(commentService.getStatusStats());
+    }
+
+    @GetMapping("/review-list")
+    @Operation(summary = "分页查询待审核评论", description = "查询待审核(status=3)评论列表，支持按评论内容、用户昵称、视频标题模糊搜索")
+    public R<IPage<CommentVo>> reviewList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) String nickName,
+            @RequestParam(required = false) String videoTitle) {
+        return R.success(commentService.pageReviewList(page, size, content, nickName, videoTitle));
+    }
+
+    @PostMapping("/review")
+    @Operation(summary = "审核评论", description = "对待审核评论执行审核操作：reviewStatus=0 通过（status变为正常），reviewStatus=2 拒绝（status变为运营屏蔽）")
+    public R<String> review(@RequestBody CommentReviewDto dto) {
+        commentService.review(dto.getCommentId(), dto.getReviewStatus());
+        return R.success("审核操作成功");
     }
 }

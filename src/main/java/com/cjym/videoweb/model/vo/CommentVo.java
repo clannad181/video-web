@@ -47,7 +47,7 @@ public class CommentVo {
     @Schema(description = "直接子评论数")
     private Integer replyCount;
 
-    @Schema(description = "0-正常，1-用户删除，2-运营屏蔽")
+    @Schema(description = "0-正常，1-用户删除，2-运营屏蔽，3-待审核")
     private Integer status;
 
     @Schema(description = "当前用户是否已点赞")

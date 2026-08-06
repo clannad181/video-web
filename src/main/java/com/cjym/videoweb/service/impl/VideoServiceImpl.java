@@ -19,6 +19,7 @@ import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.model.vo.WebConfigVo;
@@ -37,6 +38,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
 
 @Service
 public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements VideoService {
@@ -341,6 +344,26 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }).collect(Collectors.toList());
     }
 
+    @Override
+    public List<DailyIncrementVo> getDailyIncrement() {
+        List<DailyIncrementVo> dbList = baseMapper.selectDailyIncrement();
+        Map<LocalDate, DailyIncrementVo> dateMap = dbList.stream()
+                .collect(Collectors.toMap(DailyIncrementVo::getDate, v -> v));
+        LocalDate today = LocalDate.now();
+        List<DailyIncrementVo> result = new ArrayList<>(7);
+        for (int i = 6; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            DailyIncrementVo vo = dateMap.get(day);
+            if (vo == null) {
+                vo = new DailyIncrementVo();
+                vo.setDate(day);
+                vo.setVideoCount(0L);
+            }
+            result.add(vo);
+        }
+        return result;
+    }
+
     // ==================== 私有方法 ====================
 
     /**
@@ -530,5 +553,11 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
             vo.setEpisodeCount(video.getEpisodeCount());
         }
         return vo;
+    }
+
+    @Override
+    public IPage<VideoPageDto> pageReview(Integer page, Integer size, String title, String nickName) {
+        Page<VideoPageDto> pageParam = new Page<>(page, size);
+        return baseMapper.selectReviewPage(pageParam, title, nickName);
     }
 }

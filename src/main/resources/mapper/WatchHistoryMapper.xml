@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.WatchHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.cjym.videoweb.model.entity.WatchHistory">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="video_id" property="videoId" jdbcType="BIGINT"/>
+        <result column="episode_id" property="episodeId" jdbcType="BIGINT"/>
+        <result column="watched_seconds" property="watchedSeconds" jdbcType="BIGINT"/>
+        <result column="play_link" property="playLink" jdbcType="VARCHAR"/>
+        <result column="watch_time" property="watchTime" jdbcType="TIMESTAMP"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <!-- ==================== WatchHistoryVo 结果映射 ==================== -->
+    <resultMap id="WatchHistoryVoResultMap" type="com.cjym.videoweb.model.vo.WatchHistoryVo">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="video_id" property="videoId" jdbcType="BIGINT"/>
+        <result column="video_avid" property="videoAvid" jdbcType="VARCHAR"/>
+        <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
+        <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
+        <result column="episode_id" property="episodeId" jdbcType="BIGINT"/>
+        <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
+        <result column="episode_title" property="episodeTitle" jdbcType="VARCHAR"/>
+        <result column="episode_number" property="episodeNumber" jdbcType="INTEGER"/>
+        <result column="watched_seconds" property="watchedSeconds" jdbcType="BIGINT"/>
+        <result column="play_link" property="playLink" jdbcType="VARCHAR"/>
+        <result column="watch_time" property="watchTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- ==================== 分页查询用户观看历史（关联视频和剧集） ==================== -->
+    <select id="selectWatchHistoryPage" resultMap="WatchHistoryVoResultMap">
+        SELECT
+            wh.id,
+            wh.user_id,
+            wh.video_id,
+            wh.episode_id,
+            wh.watched_seconds,
+            wh.play_link,
+            wh.watch_time,
+            vi.avid       AS video_avid,
+            vi.title      AS video_title,
+            vi.cover_url  AS video_cover,
+            ve.avid       AS episode_avid,
+            ve.title      AS episode_title,
+            ve.episode_number
+        FROM public.watch_history wh
+        LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
+        LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
+        WHERE wh.is_delete = 0
+          AND wh.user_id = #{userId}
+        ORDER BY wh.watch_time DESC
+    </select>
+
+</mapper>

@@ -16,6 +16,18 @@ public class VideoReviewStatsVo {
     @Schema(description = "审核完成数（所有剧集均已审核）")
     private Long completedCount;
 
+    @Schema(description = "草稿数（video_status = 0）")
+    private Long draftCount;
+
+    @Schema(description = "待发布数（video_status = 1）")
+    private Long pendingPublishCount;
+
+    @Schema(description = "已发布数（video_status = 2）")
+    private Long publishedCount;
+
+    @Schema(description = "已下架数（video_status = 3）")
+    private Long removedCount;
+
     @Schema(description = "今日新增视频数")
     private Long todayNewCount;
 
