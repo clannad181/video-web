@@ -4,15 +4,21 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
+import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
+import com.cjym.videoweb.model.vo.CategoryStatsVo;
+import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/admin/video")
@@ -29,13 +35,14 @@ public class VideoController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Integer reviewStatus,
+            @RequestParam(required = false) String videoId,
+            @RequestParam(required = false) Integer videoStatus,
             @RequestParam(required = false) String nickName,
             @RequestParam(required = false) String uid,
             @RequestParam(required = false) Integer field,
             @RequestParam(required = false) String descOrAsc,
             @RequestParam(required = false) Boolean isOngoing) {
-        return R.success(videoService.pageVideo(page, size, title, categoryId, reviewStatus, nickName, uid, field, descOrAsc, isOngoing));
+        return R.success(videoService.pageVideo(page, size, title, categoryId, videoStatus, nickName, uid, field, descOrAsc, isOngoing,videoId));
     }
 
     @GetMapping("/{id}")
@@ -46,9 +53,8 @@ public class VideoController {
 
     @PostMapping("/add")
     @Operation(summary = "新增视频", description = "新增视频（含剧集和标签）")
-    public R<String> add(@RequestBody VideoSaveDto dto) {
-        videoService.add(dto);
-        return R.success("新增视频成功");
+    public R<Video> add(@RequestBody VideoSaveDto dto) {
+        return R.success(videoService.add(dto));
     }
 
     @PostMapping("/update")
@@ -85,9 +91,39 @@ public class VideoController {
         return R.success(videoService.getReviewStats());
     }
 
+    @GetMapping("/category-stats")
+    @Operation(summary = "分类统计", description = "按分类分组统计视频数量，categoryId 替换为分类中文名（优先Redis缓存）")
+    public R<List<CategoryStatsVo>> categoryStats() {
+        return R.success(videoService.getCategoryStats());
+    }
+
     @PostMapping("/episode/save")
     @Operation(summary = "批量保存剧集", description = "批量保存剧集（增量更新：区分新增/更新/删除，保留统计数据和审核状态）")
     public R<String> saveEpisodes(@RequestBody VideoEpisodeSaveBatchDto dto) {
         return videoService.saveEpisodes(dto);
+    }
+
+    @GetMapping("/episode/avid/{avid}")
+    @Operation(summary = "根据avid跳转指定集数", description = "通过剧集avid查找对应剧集及其父视频信息，实现指定集数跳转")
+    public R<VideoEpisodeVo> getEpisodeByAvid(@PathVariable String avid) {
+        return R.success(videoService.getEpisodeByAvid(avid));
+    }
+
+
+    /**
+     * 根据视频avid和剧集avid跳转到指定集数播放页
+     *
+     * @param videoUid   视频avid（如 av1a2b3C）
+     * @param episodeUid 剧集avid（如 avXyz789），用于前端标记当前播放的集数
+     */
+    @GetMapping("/{videoUid}/episode/{episodeUid}")
+    @Operation(summary = "跳转到指定集数播放", description = "根据视频avid和剧集avid获取视频详情+全部剧集列表，前端根据episodeUid定位播放集数")
+    public R<VideoVo> playEpisode(
+            @Parameter(description = "视频avid") @PathVariable String videoUid,
+            @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
+        VideoVo vo = videoService.getDetailByAvid(videoUid);
+        // episodeUid 由前端从 episodes 列表中匹配 avid 来定位当前播放的集数
+        // 服务端只需返回完整视频信息（含剧集列表），不需额外处理
+        return R.success(vo);
     }
 }

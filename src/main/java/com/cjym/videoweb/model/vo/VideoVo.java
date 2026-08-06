@@ -14,6 +14,9 @@ public class VideoVo {
     @Schema(description = "视频id")
     private Long id;
 
+    @Schema(description = "视频avid")
+    private String avid;
+
     @Schema(description = "视频标题")
     private String title;
 

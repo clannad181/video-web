@@ -35,4 +35,7 @@ public class VideoSaveDto {
 
     @Schema(description = "标签列表")
     private List<String> tags;
+
+    @Schema(description = "剧集列表")
+    private List<VideoEpisodeSaveDto> episodes;
 }

@@ -25,6 +25,7 @@ import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.model.vo.UserStatsVo;
 import com.cjym.videoweb.model.vo.UserVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EmailSendService;
@@ -175,7 +176,11 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         List<RoleMenuBind> roleMenuBinds = roleMenuBindMapper.selectList(lambdaQueryWrapper);
         if(roleMenuBinds!=null && !roleMenuBinds.isEmpty()){
             Set<Long> menuIds = roleMenuBinds.stream().map(RoleMenuBind::getMenuId).collect(Collectors.toSet());
-            List<Menu> menus = menuMapper.selectByIds(menuIds);
+            LambdaQueryWrapper<Menu> menuLambdaQueryWrapper=new LambdaQueryWrapper<>();
+            menuLambdaQueryWrapper.in(Menu::getId, menuIds);
+            menuLambdaQueryWrapper.eq(Menu::getStatus, true);
+            menuLambdaQueryWrapper.orderByAsc(Menu::getDescSort, Menu::getId);
+            List<Menu> menus = menuMapper.selectList(menuLambdaQueryWrapper);
             // 转换为 MenuDto 列表
             List<MenuDto> allDtos = menus.stream().map(m -> {
                 MenuDto dto = new MenuDto();
@@ -372,6 +377,22 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         Page<UserPageDto> pageParam = new Page<>(page, size);
         IPage<UserPageDto> result = baseMapper.selectUserPage(pageParam, userName, nikeName, email, status, roleId, type, isVip);
         return R.success(result);
+    }
+
+    @Override
+    public UserStatsVo getUserStats() {
+        UserStatsVo vo = baseMapper.selectUserStats();
+        // 计算较昨日的变化差值
+        Long ydNew = vo.getYesterdayNewCount() != null ? vo.getYesterdayNewCount() : 0L;
+        Long ydActive = vo.getYesterdayActiveCount() != null ? vo.getYesterdayActiveCount() : 0L;
+        Long tdNew = vo.getTodayNewCount() != null ? vo.getTodayNewCount() : 0L;
+        Long tdActive = vo.getTodayActiveCount() != null ? vo.getTodayActiveCount() : 0L;
+        vo.setTodayNewDiff(tdNew - ydNew);
+        vo.setTodayActiveDiff(tdActive - ydActive);
+        // 清理内部字段，不返回给前端
+        vo.setYesterdayNewCount(null);
+        vo.setYesterdayActiveCount(null);
+        return vo;
     }
 
     public void saveRefreshToken(String refreshToken,String username) {

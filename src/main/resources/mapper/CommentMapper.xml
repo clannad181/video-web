@@ -5,6 +5,8 @@
     <resultMap id="CommentVoResultMap" type="com.cjym.videoweb.model.vo.CommentVo">
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="video_id" property="videoId" jdbcType="BIGINT"/>
+        <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
+        <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
         <result column="user_id" property="userId" jdbcType="BIGINT"/>
         <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
         <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
@@ -67,6 +69,50 @@
           AND c.parent_id != 0
           AND c.status != 2
         ORDER BY c.create_time ASC
+    </select>
+
+    <!-- 管理端多条件分页查询评论列表 -->
+    <select id="selectAdminList" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               v.title AS video_title, v.cover_url AS video_cover,
+               FALSE AS liked
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        LEFT JOIN public.video_info v ON c.video_id = v.id
+        <where>
+            <if test="videoId != null">
+                AND c.video_id = #{videoId}
+            </if>
+            <if test="status != null">
+                AND c.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND c.content LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="nickName != null and nickName != ''">
+                AND u.nike_name LIKE CONCAT('%', #{nickName}, '%')
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND c.create_time &gt;= TO_TIMESTAMP(#{startTime}, 'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND c.create_time &lt;= TO_TIMESTAMP(#{endTime}, 'YYYY-MM-DD HH24:MI:SS')
+            </if>
+        </where>
+        ORDER BY c.create_time DESC
+    </select>
+
+    <!-- 评论状态统计 -->
+    <select id="selectStatusStats" resultType="com.cjym.videoweb.model.vo.CommentStatusStatsVo">
+        SELECT
+            COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) AS normal_count,
+            COALESCE(SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END), 0) AS user_deleted_count,
+            COALESCE(SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END), 0) AS admin_blocked_count,
+            COALESCE(SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END), 0) AS pending_review_count,
+            COUNT(*) AS total_count
+        FROM public.comment
     </select>
 
 </mapper>

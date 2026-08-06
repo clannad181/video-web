@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
+import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 
 import java.util.List;
@@ -40,4 +41,17 @@ public interface CommentService extends IService<Comment> {
      * 运营屏蔽评论（软删 status=2）
      */
     void deleteByAdmin(Long commentId);
+
+    /**
+     * 管理端多条件分页查询评论列表
+     */
+    IPage<CommentVo> pageAdminList(Integer page, Integer size,
+                                    Long videoId, Integer status,
+                                    String keyword, String nickName,
+                                    String startTime, String endTime);
+
+    /**
+     * 评论状态统计：按 status 分组计数
+     */
+    CommentStatusStatsVo getStatusStats();
 }

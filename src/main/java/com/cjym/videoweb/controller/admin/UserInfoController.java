@@ -6,6 +6,7 @@ import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.model.vo.UserStatsVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.UserVo;
@@ -93,6 +94,12 @@ public class UserInfoController {
                                            @RequestParam(required = false) Integer type,
                                            @RequestParam(required = false) Boolean isVip) {
         return userInfoService.listUsers(page, size, userName, nikeName, email, status, roleId, type, isVip);
+    }
+
+    @GetMapping("/stats")
+    @Operation(summary = "用户统计总览", description = "总数/大会员/管理员 + 今日/昨日新增 + 今日/昨日活跃，含同比变化")
+    public R<UserStatsVo> getUserStats() {
+        return R.success(userInfoService.getUserStats());
     }
 
 }

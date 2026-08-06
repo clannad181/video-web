@@ -19,6 +19,9 @@ public class VideoEpisode {
     @Schema(description = "视频id")
     private Long videoId;
 
+    @Schema(description = "剧集avid（av + Base62编码的雪花ID，用于指定集数跳转）")
+    private String avid;
+
     @Schema(description = "集数序号（如第1集）")
     private Integer episodeNumber;
 

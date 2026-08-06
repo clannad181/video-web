@@ -4,6 +4,7 @@
 
     <resultMap id="BaseResultMap" type="com.cjym.videoweb.model.entity.Video">
         <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="avid" property="avid" jdbcType="VARCHAR"/>
         <result column="title" property="title" jdbcType="VARCHAR"/>
         <result column="description" property="description" jdbcType="VARCHAR"/>
         <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
@@ -21,6 +22,7 @@
 
     <resultMap id="VideoPageDtoResultMap" type="com.cjym.videoweb.model.dto.VideoPageDto">
         <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="avid" property="avid" jdbcType="VARCHAR"/>
         <result column="title" property="title" jdbcType="VARCHAR"/>
         <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
         <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
@@ -38,7 +40,7 @@
     </resultMap>
 
     <select id="selectVideoPage" resultMap="VideoPageDtoResultMap">
-        SELECT v.id, v.title, v.cover_url, v.total_duration, v.episode_count,
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
                COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
                COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
                v.is_ongoing, v.video_status, v.create_time,
@@ -58,14 +60,14 @@
             <if test="title != null and title != ''">
                 AND v.title LIKE CONCAT('%', #{title}, '%')
             </if>
+            <if test="avid != null and avid != ''">
+                AND v.avid LIKE CONCAT('%', #{avid}, '%')
+            </if>
             <if test="categoryId != null">
                 AND v.category_id = #{categoryId}
             </if>
-            <if test="reviewStatus != null">
-                AND EXISTS (
-                    SELECT 1 FROM public.video_episode e
-                    WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = #{reviewStatus}
-                )
+            <if test="videoStates != null">
+                AND v.video_status = #{videoStates}
             </if>
             <if test="nickName != null and nickName != ''">
                 AND u.nike_name LIKE CONCAT('%', #{nickName}, '%')
@@ -89,6 +91,7 @@
 
     <resultMap id="VideoDetailResultMap" type="com.cjym.videoweb.model.vo.VideoVo">
         <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="avid" property="avid" jdbcType="VARCHAR"/>
         <result column="title" property="title" jdbcType="VARCHAR"/>
         <result column="description" property="description" jdbcType="VARCHAR"/>
         <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
@@ -113,7 +116,7 @@
     </resultMap>
 
     <select id="selectDetailById" resultMap="VideoDetailResultMap">
-        SELECT v.id, v.title, v.description, v.category_id, v.cover_url,
+        SELECT v.id, v.avid, v.title, v.description, v.category_id, v.cover_url,
                v.total_duration, v.episode_count,
                COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
                COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
@@ -129,21 +132,47 @@
         WHERE v.id = #{id} AND v.is_delete = 0
     </select>
 
+    <!-- 根据 avid 查询视频详情 -->
+    <select id="selectDetailByAvid" resultMap="VideoDetailResultMap">
+        SELECT v.id, v.avid, v.title, v.description, v.category_id, v.cover_url,
+               v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               COALESCE((SELECT SUM(e.like_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS like_count,
+               COALESCE((SELECT SUM(e.coin_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS coin_count,
+               COALESCE((SELECT SUM(e.viewer_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS viewer_count,
+               v.user_id, v.is_ongoing, v.video_status, v.create_time, v.update_time,
+               c.name AS category_name,
+               u.user_name, u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.avid = #{avid} AND v.is_delete = 0
+    </select>
+
     <!-- ==================== 审核状态统计 ==================== -->
 
     <resultMap id="ReviewStatsResultMap" type="com.cjym.videoweb.model.vo.VideoReviewStatsVo">
         <result column="pending_count" property="pendingCount" jdbcType="BIGINT"/>
         <result column="partial_count" property="partialCount" jdbcType="BIGINT"/>
         <result column="completed_count" property="completedCount" jdbcType="BIGINT"/>
+        <result column="today_new_count" property="todayNewCount" jdbcType="BIGINT"/>
+        <result column="yesterday_new_count" property="yesterdayNewCount" jdbcType="BIGINT"/>
+        <result column="today_pending_count" property="todayPendingCount" jdbcType="BIGINT"/>
+        <result column="yesterday_pending_count" property="yesterdayPendingCount" jdbcType="BIGINT"/>
     </resultMap>
 
     <select id="selectReviewStats" resultMap="ReviewStatsResultMap">
         SELECT
             COALESCE(SUM(CASE WHEN vs = 0 THEN 1 ELSE 0 END), 0) AS pending_count,
             COALESCE(SUM(CASE WHEN vs = 1 THEN 1 ELSE 0 END), 0) AS partial_count,
-            COALESCE(SUM(CASE WHEN vs = 2 THEN 1 ELSE 0 END), 0) AS completed_count
+            COALESCE(SUM(CASE WHEN vs = 2 THEN 1 ELSE 0 END), 0) AS completed_count,
+            COALESCE(SUM(CASE WHEN create_date = CURRENT_DATE THEN 1 ELSE 0 END), 0) AS today_new_count,
+            COALESCE(SUM(CASE WHEN create_date = CURRENT_DATE - 1 THEN 1 ELSE 0 END), 0) AS yesterday_new_count,
+            COALESCE(SUM(CASE WHEN vs = 0 AND create_date = CURRENT_DATE THEN 1 ELSE 0 END), 0) AS today_pending_count,
+            COALESCE(SUM(CASE WHEN vs = 0 AND create_date = CURRENT_DATE - 1 THEN 1 ELSE 0 END), 0) AS yesterday_pending_count
         FROM (
-            SELECT v.id,
+            SELECT v.id, v.create_time::date AS create_date,
                 (SELECT CASE
                     WHEN COUNT(*) = 0 THEN 0
                     WHEN SUM(CASE WHEN e.review_status = 0 THEN 1 ELSE 0 END) = COUNT(*) THEN 0
@@ -153,6 +182,18 @@
             FROM public.video_info v
             WHERE v.is_delete = 0
         ) t
+    </select>
+
+    <!-- ==================== 分类统计 ==================== -->
+
+    <select id="selectCategoryStats" resultType="java.util.HashMap">
+        SELECT CAST(v.category_id AS BIGINT) AS category_id,
+               COUNT(*) AS video_count
+        FROM public.video_info v
+        WHERE v.is_delete = 0
+          AND v.category_id IS NOT NULL
+        GROUP BY v.category_id
+        ORDER BY video_count DESC
     </select>
 
 </mapper>

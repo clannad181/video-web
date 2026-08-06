@@ -10,6 +10,12 @@ public class VideoEpisodeVo {
     @Schema(description = "剧集id")
     private Long id;
 
+    @Schema(description = "所属视频id")
+    private Long videoId;
+
+    @Schema(description = "剧集avid")
+    private String avid;
+
     @Schema(description = "集数序号")
     private Integer episodeNumber;
 
@@ -42,4 +48,18 @@ public class VideoEpisodeVo {
 
     @Schema(description = "观看人数")
     private Long viewerCount;
+
+    // ========== 以下为关联视频信息（按avid跳转时填充） ==========
+
+    @Schema(description = "关联视频标题")
+    private String videoTitle;
+
+    @Schema(description = "关联视频封面URL")
+    private String videoCover;
+
+    @Schema(description = "关联视频avid")
+    private String videoAvid;
+
+    @Schema(description = "视频总集数")
+    private Integer episodeCount;
 }

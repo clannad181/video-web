@@ -8,6 +8,7 @@ import com.cjym.videoweb.model.entity.OperationLog;
 import com.cjym.videoweb.model.vo.IpRankVo;
 import com.cjym.videoweb.model.vo.LogOverviewVo;
 import com.cjym.videoweb.model.vo.OperationTrendVo;
+import com.cjym.videoweb.model.vo.HourlyActiveVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -45,4 +46,9 @@ public interface OperationLogMapper extends BaseMapper<OperationLog> {
      * 访问IP排行：最近7天访问次数最多的3个IP
      */
     List<IpRankVo> selectIpRank();
+
+    /**
+     * 每小时活跃用户统计：最近24小时每小时去重用户数
+     */
+    List<HourlyActiveVo> selectHourlyActiveUsers();
 }

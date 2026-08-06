@@ -10,6 +10,7 @@ import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.PasswordVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.model.vo.UserStatsVo;
 import com.cjym.videoweb.result.R;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -75,4 +76,9 @@ public interface UserInfoService extends IService<UserInfo> {
     R<IPage<UserPageDto>> listUsers(Integer page, Integer size,
                                     String userName, String nikeName, String email,
                                     Integer status, Long roleId, Integer type, Boolean isVip);
+
+    /**
+     * 用户统计总览：总数/大会员/管理员 + 今日/昨日新增 + 今日/昨日活跃
+     */
+    UserStatsVo getUserStats();
 }

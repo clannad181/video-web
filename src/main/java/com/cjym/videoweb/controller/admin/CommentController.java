@@ -2,6 +2,7 @@ package com.cjym.videoweb.controller.admin;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
+import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CommentService;
@@ -24,6 +25,20 @@ public class CommentController {
     @Operation(summary = "发表评论/回复", description = "发表一级评论或回复子评论：parentId不传或传0为一级评论，传父评论ID为回复")
     public R<CommentVo> create(@RequestBody CommentSaveDto dto) {
         return R.success(commentService.create(dto));
+    }
+
+    @GetMapping("/list")
+    @Operation(summary = "管理端多条件分页查询评论列表", description = "支持按视频ID、状态、内容关键词、用户昵称、时间范围筛选")
+    public R<IPage<CommentVo>> adminList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) Long videoId,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String nickName,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime) {
+        return R.success(commentService.pageAdminList(page, size, videoId, status, keyword, nickName, startTime, endTime));
     }
 
     @GetMapping
@@ -57,9 +72,15 @@ public class CommentController {
     }
 
     @GetMapping("/admin-delete/{commentId}")
-    @Operation(summary = "运营屏蔽评论", description = "管理员屏蔽违规评论（软删，标记状态为2）")
+    @Operation(summary = "运营屏蔽或恢复评论", description = "管理员屏蔽违规评论（软删，标记状态为2）")
     public R<String> deleteByAdmin(@PathVariable Long commentId) {
         commentService.deleteByAdmin(commentId);
         return R.success("屏蔽评论成功");
+    }
+
+    @GetMapping("/status-stats")
+    @Operation(summary = "评论状态统计", description = "统计各状态评论数量：正常、用户删除、运营屏蔽及总数")
+    public R<CommentStatusStatsVo> statusStats() {
+        return R.success(commentService.getStatusStats());
     }
 }

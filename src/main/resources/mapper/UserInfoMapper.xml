@@ -114,4 +114,27 @@
         WHERE user_name = #{username} and type=1
     </select>
 
+    <!-- ==================== 用户统计总览 ==================== -->
+
+    <resultMap id="UserStatsResultMap" type="com.cjym.videoweb.model.vo.UserStatsVo">
+        <result column="total_count" property="totalCount" jdbcType="BIGINT"/>
+        <result column="vip_count" property="vipCount" jdbcType="BIGINT"/>
+        <result column="admin_count" property="adminCount" jdbcType="BIGINT"/>
+        <result column="today_new_count" property="todayNewCount" jdbcType="BIGINT"/>
+        <result column="yesterday_new_count" property="yesterdayNewCount" jdbcType="BIGINT"/>
+        <result column="today_active_count" property="todayActiveCount" jdbcType="BIGINT"/>
+        <result column="yesterday_active_count" property="yesterdayActiveCount" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <select id="selectUserStats" resultMap="UserStatsResultMap">
+        SELECT
+            (SELECT COUNT(*) FROM public.user_info WHERE is_delete = 0) AS total_count,
+            (SELECT COUNT(*) FROM public.user_info WHERE is_delete = 0 AND is_vip = true) AS vip_count,
+            (SELECT COUNT(*) FROM public.user_info WHERE is_delete = 0 AND type = 1) AS admin_count,
+            (SELECT COUNT(*) FROM public.user_info WHERE is_delete = 0 AND create_time::date = CURRENT_DATE) AS today_new_count,
+            (SELECT COUNT(*) FROM public.user_info WHERE is_delete = 0 AND create_time::date = CURRENT_DATE - 1) AS yesterday_new_count,
+            (SELECT COUNT(DISTINCT user_id) FROM public.operation_log WHERE is_delete = 0 AND operation_time::date = CURRENT_DATE) AS today_active_count,
+            (SELECT COUNT(DISTINCT user_id) FROM public.operation_log WHERE is_delete = 0 AND operation_time::date = CURRENT_DATE - 1) AS yesterday_active_count
+    </select>
+
 </mapper>

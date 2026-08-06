@@ -131,4 +131,20 @@
         LIMIT 3
     </select>
 
+    <!-- 每小时活跃用户：最近24小时每小时去重用户数 -->
+    <resultMap id="HourlyActiveMap" type="com.cjym.videoweb.model.vo.HourlyActiveVo">
+        <result column="hour" property="hour"/>
+        <result column="activeCount" property="activeCount"/>
+    </resultMap>
+
+    <select id="selectHourlyActiveUsers" resultMap="HourlyActiveMap">
+        SELECT TO_CHAR(date_trunc('hour', operation_time), 'HH24:MI') AS hour,
+               COUNT(DISTINCT user_id) AS "activeCount"
+        FROM public.operation_log
+        WHERE is_delete = 0
+          AND operation_time &gt;= date_trunc('hour', NOW()) - INTERVAL '23 hours'
+        GROUP BY date_trunc('hour', operation_time)
+        ORDER BY date_trunc('hour', operation_time)
+    </select>
+
 </mapper>

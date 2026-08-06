@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.UserStatsVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -41,4 +42,9 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
 
 
     UserDto selectDtoByUsername(@Param("username") String username);
+
+    /**
+     * 用户统计总览：总数/大会员/管理员 + 今日/昨日新增 + 今日/昨日活跃
+     */
+    UserStatsVo selectUserStats();
 }

@@ -13,6 +13,7 @@ import com.cjym.videoweb.model.vo.IpRankVo;
 import com.cjym.videoweb.model.vo.LogOverviewVo;
 import com.cjym.videoweb.model.vo.OperationLogDetailVo;
 import com.cjym.videoweb.model.vo.OperationTrendVo;
+import com.cjym.videoweb.model.vo.HourlyActiveVo;
 import com.cjym.videoweb.service.OperationLogService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +100,26 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
     @Override
     public List<IpRankVo> getIpRank() {
         return baseMapper.selectIpRank();
+    }
+
+    @Override
+    public List<HourlyActiveVo> getHourlyActiveUsers() {
+        List<HourlyActiveVo> dbList = baseMapper.selectHourlyActiveUsers();
+        Map<String, HourlyActiveVo> hourMap = dbList.stream()
+                .collect(Collectors.toMap(HourlyActiveVo::getHour, v -> v));
+        // 补全最近24小时，无数据的时段填 0
+        List<HourlyActiveVo> result = new ArrayList<>(24);
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 23; i >= 0; i--) {
+            LocalDateTime dt = now.minusHours(i).withMinute(0).withSecond(0).withNano(0);
+            String hourKey = String.format("%02d:00", dt.getHour());
+            HourlyActiveVo vo = hourMap.get(hourKey);
+            if (vo == null) {
+                vo = new HourlyActiveVo(hourKey, 0L);
+            }
+            result.add(vo);
+        }
+        return result;
     }
 
     /**

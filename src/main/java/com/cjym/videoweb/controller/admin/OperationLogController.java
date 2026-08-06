@@ -7,6 +7,7 @@ import com.cjym.videoweb.model.vo.LogOverviewVo;
 import com.cjym.videoweb.model.vo.LoginAccountRankVo;
 import com.cjym.videoweb.model.vo.OperationLogDetailVo;
 import com.cjym.videoweb.model.vo.OperationTrendVo;
+import com.cjym.videoweb.model.vo.HourlyActiveVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.LoginLogService;
 import com.cjym.videoweb.service.OperationLogService;
@@ -75,6 +76,12 @@ public class OperationLogController {
     @Operation(summary = "访问IP排行", description = "最近7天访问次数最多的3个IP地址")
     public R<List<IpRankVo>> getIpRank() {
         return R.success(operationLogService.getIpRank());
+    }
+
+    @GetMapping("/hourlyActive")
+    @Operation(summary = "每小时活跃用户", description = "最近24小时每小时去重用户数，无数据的时段填0")
+    public R<List<HourlyActiveVo>> getHourlyActiveUsers() {
+        return R.success(operationLogService.getHourlyActiveUsers());
     }
 
 

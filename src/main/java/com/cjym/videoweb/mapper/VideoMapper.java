@@ -6,10 +6,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
+import com.cjym.videoweb.model.vo.VideoVo;
+import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.List;
 import java.util.Map;
 
 @Mapper
@@ -21,17 +22,23 @@ public interface VideoMapper extends BaseMapper<Video> {
     IPage<VideoPageDto> selectVideoPage(Page<VideoPageDto> page,
                                          @Param("title") String title,
                                          @Param("categoryId") Long categoryId,
-                                         @Param("reviewStatus") Integer reviewStatus,
+                                         @Param("videoStates") Integer videoStates,
                                          @Param("nickName") String nickName,
                                          @Param("uid") String uid,
                                          @Param("orderColumn") String orderColumn,
                                          @Param("orderDirection") String orderDirection,
-                                         @Param("isOngoing") Boolean isOngoing);
+                                         @Param("isOngoing") Boolean isOngoing,
+                                         @Param("avid") String avid);
 
     /**
      * 查询视频详情（JOIN user_info 获取UP主最新信息）
      */
-    com.cjym.videoweb.model.vo.VideoVo selectDetailById(@Param("id") Long id);
+    VideoVo selectDetailById(@Param("id") Long id);
+
+    /**
+     * 根据 avid 查询视频详情
+     */
+    VideoVo selectDetailByAvid(@Param("avid") String avid);
 
     /**
      * 查询视频审核状态统计（按视频级聚合审核状态分组计数）
@@ -41,5 +48,6 @@ public interface VideoMapper extends BaseMapper<Video> {
     /**
      * 按分类统计视频数量（排除 category_id 为空的视频）
      */
-    List<Map<String, Object>> selectCategoryStats();
+    @MapKey("category_id")
+    Map<Long, Map<String, Object>> selectCategoryStats();
 }

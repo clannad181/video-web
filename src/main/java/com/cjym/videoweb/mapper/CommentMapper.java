@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.entity.Comment;
+import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -26,4 +27,20 @@ public interface CommentMapper extends BaseMapper<Comment> {
      */
     List<CommentVo> selectReplies(@Param("rootId") Long rootId,
                                    @Param("currentUserId") Long currentUserId);
+
+    /**
+     * 管理端多条件分页查询评论列表（含回复，支持按内容关键词、昵称、状态、视频ID、时间范围筛选）
+     */
+    IPage<CommentVo> selectAdminList(Page<CommentVo> page,
+                                      @Param("videoId") Long videoId,
+                                      @Param("status") Integer status,
+                                      @Param("keyword") String keyword,
+                                      @Param("nickName") String nickName,
+                                      @Param("startTime") String startTime,
+                                      @Param("endTime") String endTime);
+
+    /**
+     * 评论状态统计：按 status 分组计数
+     */
+    CommentStatusStatsVo selectStatusStats();
 }

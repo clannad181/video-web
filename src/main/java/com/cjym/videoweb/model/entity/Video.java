@@ -16,6 +16,9 @@ public class Video {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    @Schema(description = "视频avid（av + Base62编码的雪花ID）")
+    private String avid;
+
     @Schema(description = "视频标题")
     private String title;
 

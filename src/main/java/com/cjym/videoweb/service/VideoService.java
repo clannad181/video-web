@@ -6,9 +6,13 @@ import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Video;
+import com.cjym.videoweb.model.vo.CategoryStatsVo;
+import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.result.R;
+
+import java.util.List;
 
 public interface VideoService extends IService<Video> {
 
@@ -16,8 +20,8 @@ public interface VideoService extends IService<Video> {
      * 分页查询视频列表
      */
     IPage<VideoPageDto> pageVideo(Integer page, Integer size, String title,
-                                   Long categoryId, Integer reviewStatus, String nickName, String uid,
-                                   Integer field, String descOrAsc,Boolean isOngoing);
+                                   Long categoryId, Integer videoStates, String nickName, String uid,
+                                   Integer field, String descOrAsc,Boolean isOngoing,String avid);
 
     /**
      * 查询视频详情（含剧集和标签）
@@ -25,9 +29,14 @@ public interface VideoService extends IService<Video> {
     VideoVo getDetailById(Long id);
 
     /**
+     * 根据 avid 查询视频详情（含剧集和标签）
+     */
+    VideoVo getDetailByAvid(String avid);
+
+    /**
      * 新增视频
      */
-    void add(VideoSaveDto dto);
+    Video add(VideoSaveDto dto);
 
     /**
      * 编辑视频
@@ -59,4 +68,14 @@ public interface VideoService extends IService<Video> {
      * 查询视频审核状态统计（按视频级聚合审核状态分组计数）
      */
     VideoReviewStatsVo getReviewStats();
+
+    /**
+     * 查询视频分类统计（按分类分组计数，categoryId 替换为分类中文名）
+     */
+    List<CategoryStatsVo> getCategoryStats();
+
+    /**
+     * 根据剧集 avid 跳转指定集数（返回剧集+视频基本信息）
+     */
+    VideoEpisodeVo getEpisodeByAvid(String avid);
 }

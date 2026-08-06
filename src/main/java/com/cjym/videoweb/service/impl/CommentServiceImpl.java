@@ -13,6 +13,7 @@ import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import com.cjym.videoweb.service.CommentService;
 import com.cjym.videoweb.utils.JWTUtil;
@@ -175,8 +176,22 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         if (comment == null) {
             throw new GlobeException("评论不存在");
         }
-        comment.setStatus(CommentConstant.STATUS_ADMIN_BLOCKED);
+        comment.setStatus(comment.getStatus()==CommentConstant.STATUS_NORMAL?CommentConstant.STATUS_ADMIN_BLOCKED:CommentConstant.STATUS_NORMAL);
         baseMapper.updateById(comment);
+    }
+
+    @Override
+    public IPage<CommentVo> pageAdminList(Integer page, Integer size,
+                                           Long videoId, Integer status,
+                                           String keyword, String nickName,
+                                           String startTime, String endTime) {
+        Page<CommentVo> pageParam = new Page<>(page, size);
+        return baseMapper.selectAdminList(pageParam, videoId, status, keyword, nickName, startTime, endTime);
+    }
+
+    @Override
+    public CommentStatusStatsVo getStatusStats() {
+        return baseMapper.selectStatusStats();
     }
 
     // ==================== 私有方法 ====================

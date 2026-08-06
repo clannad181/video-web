@@ -17,6 +17,12 @@ public class CommentVo {
     @Schema(description = "视频ID")
     private Long videoId;
 
+    @Schema(description = "视频标题")
+    private String videoTitle;
+
+    @Schema(description = "视频封面URL")
+    private String videoCover;
+
     @Schema(description = "评论者用户ID")
     private Long userId;
 
