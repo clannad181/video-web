@@ -149,9 +149,27 @@
         SELECT create_time::date AS "date",
                COUNT(*) AS "count"
         FROM public.comment
-        WHERE create_time::date >= CURRENT_DATE - INTERVAL '6 days'
+        WHERE create_time::date &gt;= #{startDate}
+          AND create_time::date &lt;= #{endDate}
         GROUP BY create_time::date
         ORDER BY "date"
+    </select>
+
+    <!-- ==================== 评论总数（排除用户删除） ==================== -->
+
+    <select id="selectTotalCommentCount" resultType="long">
+        SELECT COUNT(*)
+        FROM public.comment
+        WHERE status != 1
+    </select>
+
+    <!-- ==================== 今日新增评论数 ==================== -->
+
+    <select id="selectTodayCommentCount" resultType="long">
+        SELECT COUNT(*)
+        FROM public.comment
+        WHERE status != 1
+          AND create_time::date = CURRENT_DATE
     </select>
 
 </mapper>

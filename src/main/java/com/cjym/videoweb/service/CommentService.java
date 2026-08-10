@@ -9,6 +9,7 @@ import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface CommentService extends IService<Comment> {
@@ -68,7 +69,7 @@ public interface CommentService extends IService<Comment> {
     void review(Long commentId, Integer reviewStatus);
 
     /**
-     * 评论每日增量：最近7天每天新增评论数（无数据的日期补0）
+     * 评论每日增量：按日期范围统计每天新增评论数（无数据的日期补0）
      */
-    List<DailyIncrementVo> getDailyIncrement();
+    List<DailyIncrementVo> getDailyIncrement(LocalDate startDate, LocalDate endDate);
 }

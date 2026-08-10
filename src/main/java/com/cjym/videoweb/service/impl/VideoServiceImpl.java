@@ -8,6 +8,7 @@ import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.mapper.WebConfigMapper;
+import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveDto;
@@ -345,14 +346,12 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     }
 
     @Override
-    public List<DailyIncrementVo> getDailyIncrement() {
-        List<DailyIncrementVo> dbList = baseMapper.selectDailyIncrement();
+    public List<DailyIncrementVo> getDailyIncrement(LocalDate startDate, LocalDate endDate) {
+        List<DailyIncrementVo> dbList = baseMapper.selectDailyIncrement(startDate, endDate);
         Map<LocalDate, DailyIncrementVo> dateMap = dbList.stream()
                 .collect(Collectors.toMap(DailyIncrementVo::getDate, v -> v));
-        LocalDate today = LocalDate.now();
-        List<DailyIncrementVo> result = new ArrayList<>(7);
-        for (int i = 6; i >= 0; i--) {
-            LocalDate day = today.minusDays(i);
+        List<DailyIncrementVo> result = new ArrayList<>();
+        for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
             DailyIncrementVo vo = dateMap.get(day);
             if (vo == null) {
                 vo = new DailyIncrementVo();
@@ -484,7 +483,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
      * @return true 表示开启免审自动发布
      */
     private boolean isAutoReviewEnabled() {
-        String redisKey = "web_config:list:review";
+        String redisKey = BaseConstant.WEB_CONFIG_REDIS_KEY_PREFIX + BaseConstant.WEB_CONFIG_CATEGORY_REVIEW;
         // 1. 尝试从 Redis 缓存读取
         String cached = stringRedisTemplate.opsForValue().get(redisKey);
         if (StringUtils.isNotEmpty(cached)) {
@@ -492,8 +491,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                 List<WebConfigVo> list = objectMapper.readValue(cached,
                         new TypeReference<List<WebConfigVo>>() {});
                 for (WebConfigVo vo : list) {
-                    if ("video_review".equals(vo.getKey())) {
-                        return "true".equalsIgnoreCase(vo.getValue());
+                    if (BaseConstant.WEB_CONFIG_KEY_VIDEO_REVIEW.equals(vo.getKey())) {
+                        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(vo.getValue());
                     }
                 }
                 return false;
@@ -503,10 +502,10 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         // 2. Redis 未命中或数据异常，查数据库
         LambdaQueryWrapper<WebConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(WebConfig::getCategory, "review")
-                .eq(WebConfig::getKey, "video_review");
+        wrapper.eq(WebConfig::getCategory, BaseConstant.WEB_CONFIG_CATEGORY_REVIEW)
+                .eq(WebConfig::getKey, BaseConstant.WEB_CONFIG_KEY_VIDEO_REVIEW);
         WebConfig config = webConfigMapper.selectOne(wrapper);
-        return config != null && "true".equalsIgnoreCase(config.getValue());
+        return config != null && BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(config.getValue());
     }
 
     /**

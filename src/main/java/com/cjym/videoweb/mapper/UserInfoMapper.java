@@ -44,6 +44,16 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
     UserDto selectDtoByUsername(@Param("username") String username);
 
     /**
+     * 按邮箱查询前台用户（type=0）
+     */
+    UserDto selectFrontDtoByEmail(@Param("email") String email);
+
+    /**
+     * 按用户名查询前台用户（type=0）
+     */
+    UserDto selectFrontDtoByUsername(@Param("username") String username);
+
+    /**
      * 用户统计总览：总数/大会员/管理员 + 今日/昨日新增 + 今日/昨日活跃
      */
     UserStatsVo selectUserStats();

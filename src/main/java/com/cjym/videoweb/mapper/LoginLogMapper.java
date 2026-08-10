@@ -38,4 +38,9 @@ public interface LoginLogMapper extends BaseMapper<LoginLog> {
      * 登录账号排行：最近7天登录次数最多的3个账号
      */
     List<LoginAccountRankVo> selectLoginAccountRank();
+
+    /**
+     * 今日登录人数
+     */
+    Long selectTodayLoginCount();
 }

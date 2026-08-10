@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/category")
 @Tag(name = "视频分类管理", description = "视频分类管理")
-public class CategoryController {
+public class    CategoryController {
 
     @Resource
     private CategoryService categoryService;

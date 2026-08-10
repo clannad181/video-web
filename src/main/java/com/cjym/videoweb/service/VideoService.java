@@ -13,6 +13,7 @@ import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.result.R;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface VideoService extends IService<Video> {
@@ -86,7 +87,7 @@ public interface VideoService extends IService<Video> {
     IPage<VideoPageDto> pageReview(Integer page, Integer size, String title, String nickName);
 
     /**
-     * 视频每日增量：最近7天每天新增视频数（无数据的日期补0）
+     * 视频每日增量：按日期范围统计每天新增视频数（无数据的日期补0）
      */
-    List<DailyIncrementVo> getDailyIncrement();
+    List<DailyIncrementVo> getDailyIncrement(LocalDate startDate, LocalDate endDate);
 }

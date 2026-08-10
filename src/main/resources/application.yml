@@ -32,7 +32,7 @@ spring:
   # redis配置
   data:
     redis:
-      host: localhost
+      host: 172.31.246.127
       port: 6379
   # 文件上传配置
   servlet:

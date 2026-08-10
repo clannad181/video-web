@@ -55,4 +55,58 @@
         ORDER BY wh.watch_time DESC
     </select>
 
+    <!-- ==================== 每日播放量统计 ==================== -->
+
+    <resultMap id="DailyPlayCountResultMap" type="com.cjym.videoweb.model.vo.DailyIncrementVo">
+        <result column="date" property="date"/>
+        <result column="count" property="playCount"/>
+    </resultMap>
+
+    <select id="selectDailyPlayCount" resultMap="DailyPlayCountResultMap">
+        SELECT watch_time::date AS "date",
+               COUNT(*) AS "count"
+        FROM public.watch_history
+        WHERE is_delete = 0
+          AND watch_time::date &gt;= #{startDate}
+          AND watch_time::date &lt;= #{endDate}
+        GROUP BY watch_time::date
+        ORDER BY "date"
+    </select>
+
+    <!-- ==================== 每日活跃用户统计 ==================== -->
+
+    <resultMap id="DailyActiveResultMap" type="com.cjym.videoweb.model.vo.DailyActiveVo">
+        <result column="date" property="date"/>
+        <result column="count" property="activeCount"/>
+    </resultMap>
+
+    <select id="selectDailyActiveUsers" resultMap="DailyActiveResultMap">
+        SELECT watch_time::date AS "date",
+               COUNT(DISTINCT user_id) AS "count"
+        FROM public.watch_history
+        WHERE is_delete = 0
+          AND watch_time::date &gt;= #{startDate}
+          AND watch_time::date &lt;= #{endDate}
+        GROUP BY watch_time::date
+        ORDER BY "date"
+    </select>
+
+    <!-- ==================== 今日活跃用户数 ==================== -->
+
+    <select id="selectTodayActiveUserCount" resultType="long">
+        SELECT COUNT(DISTINCT user_id)
+        FROM public.watch_history
+        WHERE is_delete = 0
+          AND watch_time::date = CURRENT_DATE
+    </select>
+
+    <!-- ==================== 今日总播放量 ==================== -->
+
+    <select id="selectTodayPlayCount" resultType="long">
+        SELECT COUNT(*)
+        FROM public.watch_history
+        WHERE is_delete = 0
+          AND watch_time::date = CURRENT_DATE
+    </select>
+
 </mapper>

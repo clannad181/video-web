@@ -252,9 +252,42 @@
                COUNT(*) AS "count"
         FROM public.video_info
         WHERE is_delete = 0
-          AND create_time::date >= CURRENT_DATE - INTERVAL '6 days'
+          AND create_time::date &gt;= #{startDate}
+          AND create_time::date &lt;= #{endDate}
         GROUP BY create_time::date
         ORDER BY "date"
+    </select>
+
+    <!-- ==================== 今日上传视频数 ==================== -->
+
+    <select id="selectTodayVideoCount" resultType="long">
+        SELECT COUNT(*)
+        FROM public.video_info
+        WHERE is_delete = 0
+          AND create_time::date = CURRENT_DATE
+    </select>
+
+    <!-- ==================== 分类每日视频增量 ==================== -->
+
+    <resultMap id="CategoryDailyIncrementResultMap" type="com.cjym.videoweb.model.vo.CategoryDailyIncrementVo">
+        <result column="date" property="date"/>
+        <result column="categoryId" property="categoryId"/>
+        <result column="categoryName" property="categoryName"/>
+        <result column="count" property="videoCount"/>
+    </resultMap>
+
+    <select id="selectCategoryDailyIncrement" resultMap="CategoryDailyIncrementResultMap">
+        SELECT v.create_time::date AS "date",
+               v.category_id AS "categoryId",
+               COALESCE(c.name, '未分类') AS "categoryName",
+               COUNT(*) AS "count"
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        WHERE v.is_delete = 0
+          AND v.create_time::date &gt;= #{startDate}
+          AND v.create_time::date &lt;= #{endDate}
+        GROUP BY v.create_time::date, v.category_id, c.name
+        ORDER BY v.category_id, v.create_time::date
     </select>
 
 </mapper>

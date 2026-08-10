@@ -20,6 +20,7 @@ import com.cjym.videoweb.model.entity.Role;
 import com.cjym.videoweb.model.entity.RoleMenuBind;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.mapper.UserInfoMapper;
+import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.CaptchaVo;
@@ -123,18 +124,23 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     public R<Map<String,Object>> login(UserLoginVo userLoginVo) {
         UserDto user = null;
         String captChaKey;
+        // 根据 loginSystem 决定服务器类型：0/前台 → SYS_FRONT，null或1/后台 → SYS_ADMIN
+        String serverType = resolveServerType(userLoginVo.getLoginSystem());
+        boolean isFront = BaseConstant.SYS_FRONT.equals(serverType);
+
         if(CaptchaConstant.ADMIN_IMG_CAPTCHA.equals(userLoginVo.getLoginType())){
             captChaKey= CaptchaConstant.ADMIN_IMG_CAPTCHA +userLoginVo.getKey();
             String redisCaptcha = stringRedisTemplate.opsForValue().getAndDelete(captChaKey);
             if(StringUtils.isEmpty(redisCaptcha)||!redisCaptcha.equalsIgnoreCase(userLoginVo.getCaptcha().toLowerCase())||StringUtils.isEmpty(userLoginVo.getCaptcha())){
                 throw new GlobeException(ResultEnum.CAPTCHA_EXPIRE.getMessage());
             }
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            userLoginVo.getUsername(),
-                            userLoginVo.getPassword().toLowerCase()
-                    )
+            // 前后台统一走 Spring Security 认证链，通过 details 传递 serverType 区分用户类型
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    userLoginVo.getUsername(),
+                    userLoginVo.getPassword().toLowerCase()
             );
+            authToken.setDetails(serverType);
+            Authentication authentication = authenticationManager.authenticate(authToken);
             user = (UserDto) authentication.getPrincipal();
         }else{
             captChaKey= CaptchaConstant.ADMIN_EMAIL_CAPTCHA +userLoginVo.getKey();
@@ -142,19 +148,34 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
             if(StringUtils.isEmpty(redisCaptcha)||!redisCaptcha.equalsIgnoreCase(userLoginVo.getCaptcha().toLowerCase())||StringUtils.isEmpty(userLoginVo.getCaptcha())){
                 throw new GlobeException(ResultEnum.CAPTCHA_EXPIRE.getMessage());
             }
-            user = baseMapper.selectDtoByEmail(userLoginVo.getEmail());
+            // 前台查 type=0 用户，后台查 type=1 用户
+            user = isFront ? baseMapper.selectFrontDtoByEmail(userLoginVo.getEmail())
+                    : baseMapper.selectDtoByEmail(userLoginVo.getEmail());
+            if (user == null) {
+                throw new GlobeException(ResultEnum.EMAIL_ERROR.getMessage());
+            }
             if (!user.isEnabled()) {
                 throw new GlobeException(ResultEnum.USER_DISABLE.getMessage());
             }
         }
-        String accessToken = JWTUtil.createAccessToken(user.getId(), BaseConstant.SYS_ADMIN,
+        String accessToken = JWTUtil.createAccessToken(user.getId(), serverType,
                 user.getUsername(), user.getAuthorities(),
-                tokenExpiryConfigService.getAccessTokenExpiry(BaseConstant.SYS_ADMIN));
-        String refreshToken = JWTUtil.createRefreshToken(user.getId(), BaseConstant.SYS_ADMIN,
+                tokenExpiryConfigService.getAccessTokenExpiry(serverType));
+        String refreshToken = JWTUtil.createRefreshToken(user.getId(), serverType,
                 user.getUsername(),
-                tokenExpiryConfigService.getRefreshTokenExpiry(BaseConstant.SYS_ADMIN));
+                tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
         saveRefreshToken(refreshToken,user.getUsername());
         return R.success(Map.of("accessToken",accessToken,"refreshToken",refreshToken));
+    }
+
+    /**
+     * 根据 loginSystem 解析 serverType
+     */
+    private String resolveServerType(Integer loginSystem) {
+        if (loginSystem != null && loginSystem == 0) {
+            return BaseConstant.SYS_ADMIN;
+        }
+        return BaseConstant.SYS_FRONT;
     }
 
     @Override
@@ -218,6 +239,22 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     }
 
     @Override
+    public R<ClientUserVo> getClientUserInfo(HttpServletRequest request) {
+        String token = request.getHeader("authorization");
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        String username = JWTUtil.getUsername(token);
+        UserInfo userInfo = baseMapper.selectByUserName(username);
+        if (userInfo == null) {
+            throw new GlobeException("用户不存在");
+        }
+        ClientUserVo vo = new ClientUserVo();
+        BeanUtils.copyProperties(userInfo, vo);
+        return R.success(vo);
+    }
+
+    @Override
     public R<Map<String, Object>> refresh(HttpServletRequest request) {
         String requestRefreshToken = request.getHeader("refresh-token");
         // 1. 验证 Refresh Token 是否有效
@@ -230,7 +267,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         // 3. 撤销旧 Refresh Token（Rotation：防止旧 token 继续使用）
         deleteByToken(requestRefreshToken);
         // 4. 生成新的 Access Token 和 Refresh Token
-        UserDto userDetails = baseMapper.selectDtoByUsername(username);
+        boolean isFront = BaseConstant.SYS_FRONT.equals(serverType);
+        UserDto userDetails = isFront ? baseMapper.selectFrontDtoByUsername(username)
+                : baseMapper.selectDtoByUsername(username);
         String newAccessToken = JWTUtil.createAccessToken(userDetails.getId(), serverType,
                 username, userDetails.getAuthorities(),
                 tokenExpiryConfigService.getAccessTokenExpiry(serverType));

@@ -4,7 +4,12 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.WatchHistorySaveDto;
 import com.cjym.videoweb.model.entity.WatchHistory;
+import com.cjym.videoweb.model.vo.DailyActiveVo;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.WatchHistoryVo;
+
+import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 观看历史记录 Service
@@ -20,4 +25,14 @@ public interface WatchHistoryService extends IService<WatchHistory> {
      * 分页查询当前用户的观看历史
      */
     IPage<WatchHistoryVo> pageHistory(Integer page, Integer size);
+
+    /**
+     * 按日期范围统计每日播放量（无数据的日期补0）
+     */
+    List<DailyIncrementVo> getDailyPlayCount(LocalDate startDate, LocalDate endDate);
+
+    /**
+     * 按日期范围统计每日活跃用户数（无数据的日期补0）
+     */
+    List<DailyActiveVo> getDailyActiveUsers(LocalDate startDate, LocalDate endDate);
 }

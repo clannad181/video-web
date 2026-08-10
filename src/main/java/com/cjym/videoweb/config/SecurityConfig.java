@@ -20,9 +20,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
                 // 禁用 CSRF（JWT 认证无需）
-                .csrf(csrf -> csrf.disable())
+        http.csrf(csrf -> csrf.disable())
                 // 禁用请求缓存，避免内部 MvcRequestMatcher 触发 UrlPathHelper.PATH 报错
                 .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 // URL 授权规则（全部放行）

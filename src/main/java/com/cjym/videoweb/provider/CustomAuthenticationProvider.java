@@ -3,6 +3,7 @@ package com.cjym.videoweb.provider;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.encoders.CustomPasswordEncoder;
 import com.cjym.videoweb.exception.GlobeException;
+import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.service.impl.CustomUserDetailsServiceImpl;
 import jakarta.annotation.Resource;
@@ -21,6 +22,9 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
     private CustomUserDetailsServiceImpl customUserDetailsServiceImpl;
 
     @Resource
+    private UserInfoMapper userInfoMapper;
+
+    @Resource
     private CustomPasswordEncoder customPasswordEncoder;
 
     /**
@@ -32,7 +36,20 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         String username = authentication.getName();
         //获取密码
         String password = authentication.getCredentials().toString();
-        UserDto user = (UserDto) customUserDetailsServiceImpl.loadUserByUsername(username);
+
+        // 从 details 中读取登录系统标识："front" → type=0 用户，其他 → type=1 用户
+        Object details = authentication.getDetails();
+        boolean isFront = BaseConstant.SYS_FRONT.equals(details);
+
+        UserDto user;
+        if (isFront) {
+            user = userInfoMapper.selectFrontDtoByUsername(username);
+            if (user == null) {
+                throw new GlobeException("账号或密码错误");
+            }
+        } else {
+            user = (UserDto) customUserDetailsServiceImpl.loadUserByUsername(username);
+        }
         // 2. 自定义状态检查
         if (!user.isEnabled()) {
             throw new GlobeException("账户已禁用");

@@ -14,6 +14,8 @@ import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.entity.WatchHistory;
+import com.cjym.videoweb.model.vo.DailyActiveVo;
+import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.WatchHistoryVo;
 import com.cjym.videoweb.service.WatchHistoryService;
 import com.cjym.videoweb.utils.JWTUtil;
@@ -24,7 +26,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 观看历史记录 Service 实现
@@ -98,6 +105,42 @@ public class WatchHistoryServiceImpl extends ServiceImpl<WatchHistoryMapper, Wat
         // 格式化观看时长为 MM:SS
         for (WatchHistoryVo vo : result.getRecords()) {
             vo.setWatchedTime(formatSeconds(vo.getWatchedSeconds()));
+        }
+        return result;
+    }
+
+    @Override
+    public List<DailyIncrementVo> getDailyPlayCount(LocalDate startDate, LocalDate endDate) {
+        List<DailyIncrementVo> dbList = baseMapper.selectDailyPlayCount(startDate, endDate);
+        Map<LocalDate, DailyIncrementVo> dateMap = dbList.stream()
+                .collect(Collectors.toMap(DailyIncrementVo::getDate, v -> v));
+        List<DailyIncrementVo> result = new ArrayList<>();
+        for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
+            DailyIncrementVo vo = dateMap.get(day);
+            if (vo == null) {
+                vo = new DailyIncrementVo();
+                vo.setDate(day);
+                vo.setPlayCount(0L);
+            }
+            result.add(vo);
+        }
+        return result;
+    }
+
+    @Override
+    public List<DailyActiveVo> getDailyActiveUsers(LocalDate startDate, LocalDate endDate) {
+        List<DailyActiveVo> dbList = baseMapper.selectDailyActiveUsers(startDate, endDate);
+        Map<LocalDate, DailyActiveVo> dateMap = dbList.stream()
+                .collect(Collectors.toMap(DailyActiveVo::getDate, v -> v));
+        List<DailyActiveVo> result = new ArrayList<>();
+        for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
+            DailyActiveVo vo = dateMap.get(day);
+            if (vo == null) {
+                vo = new DailyActiveVo();
+                vo.setDate(day);
+                vo.setActiveCount(0L);
+            }
+            result.add(vo);
         }
         return result;
     }

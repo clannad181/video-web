@@ -70,6 +70,18 @@ public class BaseConstant {
     // ==================== WebConfig 分类与键常量 ====================
     /** WebConfig 默认分类 */
     public static final String WEB_CONFIG_CATEGORY_DEFAULT = "default";
+    /** WebConfig review 分类 */
+    public static final String WEB_CONFIG_CATEGORY_REVIEW = "review";
+    /** WebConfig display 分类 */
+    public static final String WEB_CONFIG_CATEGORY_DISPLAY = "display";
     /** WebConfig 默认角色配置键 */
     public static final String WEB_CONFIG_KEY_DEFAULT_ROLE = "default_role";
+    /** WebConfig 视频免审配置键 */
+    public static final String WEB_CONFIG_KEY_VIDEO_REVIEW = "video_review";
+    /** WebConfig 评论免审配置键 */
+    public static final String WEB_CONFIG_KEY_COMMENT_REVIEW = "comment_review";
+
+    // ==================== WebConfig 通用值常量 ====================
+    /** WebConfig 布尔真值 */
+    public static final String WEB_CONFIG_VALUE_TRUE = "true";
 }

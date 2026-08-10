@@ -10,6 +10,7 @@ import com.cjym.videoweb.model.vo.CommentVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Mapper
@@ -54,7 +55,18 @@ public interface CommentMapper extends BaseMapper<Comment> {
                                        @Param("videoTitle") String videoTitle);
 
     /**
-     * 评论每日增量：最近7天每天新增评论数（按 create_time 日期分组）
+     * 评论每日增量：按日期范围统计每天新增评论数（按 create_time 日期分组）
      */
-    List<DailyIncrementVo> selectDailyIncrement();
+    List<DailyIncrementVo> selectDailyIncrement(@Param("startDate") LocalDate startDate,
+                                                 @Param("endDate") LocalDate endDate);
+
+    /**
+     * 评论总数（排除用户删除：status != 1）
+     */
+    Long selectTotalCommentCount();
+
+    /**
+     * 今日新增评论数（排除用户删除：status != 1）
+     */
+    Long selectTodayCommentCount();
 }
