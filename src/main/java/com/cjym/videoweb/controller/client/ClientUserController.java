@@ -17,7 +17,7 @@ import java.util.Map;
  * 用户登录与信息（客户端）
  */
 @RestController
-@RequestMapping("/clientuser")
+@RequestMapping("/client/user")
 @Tag(name = "用户登录与信息", description = "前台用户登录、获取用户基础信息")
 public class ClientUserController {
 

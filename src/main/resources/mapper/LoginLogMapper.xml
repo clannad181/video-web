@@ -95,12 +95,13 @@
         LIMIT 3
     </select>
 
-    <!-- ==================== 今日登录人数 ==================== -->
+    <!-- ==================== 今日登录人数（仅统计登录成功） ==================== -->
 
     <select id="selectTodayLoginCount" resultType="long">
         SELECT COUNT(DISTINCT user_id)
         FROM public.login_log
         WHERE is_delete = 0
+          AND login_status = 1
           AND login_time::date = CURRENT_DATE
     </select>
 

@@ -40,7 +40,7 @@ public interface LoginLogMapper extends BaseMapper<LoginLog> {
     List<LoginAccountRankVo> selectLoginAccountRank();
 
     /**
-     * 今日登录人数
+     * 今日登录人数（仅统计登录成功）
      */
     Long selectTodayLoginCount();
 }

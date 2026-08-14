@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.CategoryDailyIncrementVo;
+import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
@@ -33,6 +34,23 @@ public interface VideoMapper extends BaseMapper<Video> {
                                          @Param("orderDirection") String orderDirection,
                                          @Param("isOngoing") Boolean isOngoing,
                                          @Param("avid") String avid);
+
+    /**
+     * 分页查询前台展示视频（仅已发布且至少有一集审核通过），支持最新/最火热排序
+     */
+    IPage<ClientVideoVo> selectClientVideoPage(Page<ClientVideoVo> page,
+                                               @Param("orderColumn") String orderColumn);
+
+    /**
+     * 查询关注UP主的最新视频（已发布且至少有一集审核通过），按发布时间倒序
+     */
+    List<ClientVideoVo> selectFollowLatest(@Param("userId") Long userId, @Param("limit") int limit);
+
+    /**
+     * 查询最多收藏的视频TOP N（已发布且至少有一集审核通过），可排除指定视频
+     */
+    List<ClientVideoVo> selectFavoriteTop(@Param("limit") int limit,
+                                          @Param("excludeIds") List<Long> excludeIds);
 
     /**
      * 查询视频详情（JOIN user_info 获取UP主最新信息）

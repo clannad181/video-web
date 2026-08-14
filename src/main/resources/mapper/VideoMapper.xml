@@ -89,6 +89,88 @@
         </choose>
     </select>
 
+    <resultMap id="ClientVideoResultMap" type="com.cjym.videoweb.model.vo.ClientVideoVo">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="avid" property="avid" jdbcType="VARCHAR"/>
+        <result column="title" property="title" jdbcType="VARCHAR"/>
+        <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
+        <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
+        <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
+        <result column="play_count" property="playCount" jdbcType="BIGINT"/>
+        <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
+        <result column="category_name" property="categoryName" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="avatar" property="avatarUrl" jdbcType="VARCHAR"/>
+        <result column="uid" property="uid" jdbcType="VARCHAR"/>
+        <result column="is_ongoing" property="isOngoing" jdbcType="BOOLEAN"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 前台视频分页：仅已发布（video_status=2）且至少有一集审核通过（review_status=1） -->
+    <select id="selectClientVideoPage" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+        ORDER BY ${orderColumn} DESC
+    </select>
+
+    <!-- 前台推荐：关注的UP主最新视频（已发布且至少有一集审核通过） -->
+    <select id="selectFollowLatest" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+          AND v.user_id IN (SELECT f.follow_user_id FROM public.user_follow f
+                            WHERE f.user_id = #{userId} AND f.is_delete = 0)
+        ORDER BY v.create_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 前台推荐：最多收藏视频TOP N（已发布且至少有一集审核通过），可排除指定视频 -->
+    <select id="selectFavoriteTop" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+        <if test="excludeIds != null and excludeIds.size() > 0">
+            AND v.id NOT IN
+            <foreach collection="excludeIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        ORDER BY favorite_count DESC
+        LIMIT #{limit}
+    </select>
+
     <resultMap id="VideoDetailResultMap" type="com.cjym.videoweb.model.vo.VideoVo">
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="avid" property="avid" jdbcType="VARCHAR"/>

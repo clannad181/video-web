@@ -7,6 +7,7 @@ import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
+import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -24,6 +25,16 @@ public interface VideoService extends IService<Video> {
     IPage<VideoPageDto> pageVideo(Integer page, Integer size, String title,
                                    Long categoryId, Integer videoStates, String nickName, String uid,
                                    Integer field, String descOrAsc,Boolean isOngoing,String avid);
+
+    /**
+     * 分页查询前台展示视频（仅已发布且至少有一集审核通过），支持最新/最火热排序
+     */
+    IPage<ClientVideoVo> pageClientVideo(Integer page, Integer size, String sortType);
+
+    /**
+     * 前台视频推荐：已登录返回关注的UP主最新视频（不足时用最多收藏补齐），未登录返回最多收藏视频，最多6条
+     */
+    List<ClientVideoVo> recommend();
 
     /**
      * 查询视频详情（含剧集和标签）

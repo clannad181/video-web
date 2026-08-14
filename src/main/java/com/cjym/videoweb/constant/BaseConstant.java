@@ -53,6 +53,11 @@ public class BaseConstant {
 
     public static final Long DEFAULT_FRONT_USER_ROLE_ID = 9999L;
 
+    /**
+     * 前台视频推荐数量上限
+     */
+    public static final Integer VIDEO_RECOMMEND_SIZE = 6;
+
     // ==================== Token 有效期配置 key（存放在 web_config 表） ====================
     /** 前台 Access Token 有效期配置键 */
     public static final String FRONT_ACCESS_TOKEN_EXPIRY = "front_access_token_expiry";

@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cjym.videoweb.exception.GlobeException;
+import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
+import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.WebConfigMapper;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.VideoConstant;
@@ -14,11 +16,14 @@ import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
+import com.cjym.videoweb.model.entity.Follow;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
+import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
+import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -28,16 +33,20 @@ import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CategoryService;
 import com.cjym.videoweb.service.VideoService;
 import com.cjym.videoweb.utils.Base62Converter;
+import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.SnowflakeIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -70,6 +79,12 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     @Resource
     private SnowflakeIdGenerator snowflakeIdGenerator;
 
+    @Resource
+    private UserInfoMapper userInfoMapper;
+
+    @Resource
+    private FollowMapper followMapper;
+
     /**
      * 排序字段编码 → SELECT 别名 映射（1:总时长 2:播放量 3:收藏数 4:创建时间）
      */
@@ -82,6 +97,14 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     private static final Set<String> ALLOWED_DIRECTIONS = Set.of("ASC", "DESC");
 
+    /**
+     * 前台视频排序类型 → ORDER BY 列 映射（latest:按发布时间最新 hot:按播放量最火热）
+     */
+    private static final Map<String, String> CLIENT_SORT_COLUMN_MAP = Map.of(
+            VideoConstant.SORT_LATEST, "v.create_time",
+            VideoConstant.SORT_HOT, "play_count"
+    );
+
     @Override
     public IPage<VideoPageDto> pageVideo(Integer page, Integer size, String title,
                                          Long categoryId, Integer videoStates, String nickName, String uid,
@@ -91,6 +114,39 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         String orderDirection = resolveDirection(descOrAsc);
         return baseMapper.selectVideoPage(pageParam, title, categoryId, videoStates, nickName, uid,
                 orderColumn, orderDirection,isOngoing,avid);
+    }
+
+    @Override
+    public IPage<ClientVideoVo> pageClientVideo(Integer page, Integer size, String sortType) {
+        Page<ClientVideoVo> pageParam = new Page<>(page, size);
+        String orderColumn = resolveClientSortColumn(sortType);
+        IPage<ClientVideoVo> result = baseMapper.selectClientVideoPage(pageParam, orderColumn);
+        // 填充当前用户是否已关注UP主的标记
+        fillFollowStatus(result.getRecords());
+        return result;
+    }
+
+    @Override
+    public List<ClientVideoVo> recommend() {
+        List<ClientVideoVo> result;
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            // 未登录：返回最多收藏的视频
+            result = baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE, null);
+        } else {
+            // 已登录：返回所有关注UP主的最新视频（最多6条）
+            List<ClientVideoVo> follows = baseMapper.selectFollowLatest(currentUserId, BaseConstant.VIDEO_RECOMMEND_SIZE);
+            if (follows.size() < BaseConstant.VIDEO_RECOMMEND_SIZE) {
+                // 关注视频不足6条（含关注数为0）时用最多收藏的视频补齐（排除已推荐视频）
+                List<Long> excludeIds = follows.stream().map(ClientVideoVo::getId).collect(Collectors.toList());
+                List<ClientVideoVo> hot = baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE - follows.size(), excludeIds);
+                follows.addAll(hot);
+            }
+            result = follows;
+        }
+        // 填充当前用户是否已关注UP主的标记
+        fillFollowStatus(result);
+        return result;
     }
 
     @Override
@@ -527,6 +583,59 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         String upper = descOrAsc.toUpperCase();
         return ALLOWED_DIRECTIONS.contains(upper) ? upper : null;
+    }
+
+    /**
+     * 前台视频排序类型白名单解析，仅允许 latest/hot，非法值降级为最新排序
+     */
+    private String resolveClientSortColumn(String sortType) {
+        String key = sortType == null || sortType.isBlank()
+                ? VideoConstant.SORT_LATEST
+                : sortType.trim().toLowerCase();
+        return CLIENT_SORT_COLUMN_MAP.getOrDefault(key, CLIENT_SORT_COLUMN_MAP.get(VideoConstant.SORT_LATEST));
+    }
+
+    /**
+     * 从请求 JWT token 中获取当前用户ID
+     */
+    private Long getCurrentUserId() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes == null) {
+                return null;
+            }
+            HttpServletRequest request = attributes.getRequest();
+            String token = request.getHeader("authorization");
+            if (StringUtils.isEmpty(token)) {
+                return null;
+            }
+            if (token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+            String username = JWTUtil.getUsername(token);
+            UserInfo userInfo = userInfoMapper.selectByUserName(username);
+            return userInfo != null ? userInfo.getId() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 为前台视频记录填充当前用户是否已关注UP主的标记（未登录时全部为 false）
+     */
+    private void fillFollowStatus(List<ClientVideoVo> vos) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            vos.forEach(vo -> vo.setIsFollowed(false));
+            return;
+        }
+        // 一次查询当前用户的全部关注记录，避免逐条查询
+        LambdaQueryWrapper<Follow> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Follow::getUserId, currentUserId);
+        Set<Long> followedIds = followMapper.selectList(wrapper).stream()
+                .map(Follow::getFollowUserId)
+                .collect(Collectors.toSet());
+        vos.forEach(vo -> vo.setIsFollowed(followedIds.contains(vo.getUserId())));
     }
 
     @Override
