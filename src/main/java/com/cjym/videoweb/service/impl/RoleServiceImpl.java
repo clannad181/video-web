@@ -15,6 +15,7 @@ import com.cjym.videoweb.model.entity.RoleMenuBind;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.RoleService;
+import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.JWTUtil;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
@@ -22,16 +23,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 
 import com.cjym.videoweb.model.vo.RoleOptionVo;
-import com.cjym.videoweb.model.vo.WebConfigVo;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_CATEGORY_DEFAULT;
 import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_KEY_DEFAULT_ROLE;
-import static com.cjym.videoweb.constant.BaseConstant.WEB_CONFIG_REDIS_KEY_PREFIX;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,10 +41,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     private UserInfoMapper userInfoMapper;
 
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private ObjectMapper objectMapper;
+    private WebConfigService webConfigService;
 
     @Override
     public R<String> addRole(Role role) {
@@ -128,23 +120,18 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     /**
      * 解析默认角色ID
      * 查找顺序：
-     * 1. 从Redis缓存读取WebConfig中 category=default, key=default_role 的value
+     * 1. 从web_config配置（Redis缓存优先，未命中回源数据库）读取 category=default, key=default_role 的value
      * 2. 若value为空或未找到，查询Role表中未被删除且sys_def=true的角色，取level最大的
      * 3. 若仍未找到，返回null
      */
     private Long resolveDefaultRoleId() {
-        // Step 1: 从Redis缓存获取WebConfig中default分类的配置
-        String cached = stringRedisTemplate.opsForValue().get(WEB_CONFIG_REDIS_KEY_PREFIX + WEB_CONFIG_CATEGORY_DEFAULT);
-        if (StringUtils.isNotEmpty(cached)) {
+        // Step 1: 从web_config配置读取默认角色ID
+        String defaultValue = webConfigService.getConfigValue(WEB_CONFIG_CATEGORY_DEFAULT, WEB_CONFIG_KEY_DEFAULT_ROLE);
+        if (StringUtils.isNotEmpty(defaultValue)) {
             try {
-                List<WebConfigVo> configList = objectMapper.readValue(cached,
-                        new TypeReference<List<WebConfigVo>>() {});
-                for (WebConfigVo vo : configList) {
-                    if (WEB_CONFIG_KEY_DEFAULT_ROLE.equals(vo.getKey()) && StringUtils.isNotEmpty(vo.getValue())) {
-                        return Long.valueOf(vo.getValue());
-                    }
-                }
-            } catch (Exception ignored) {
+                return Long.valueOf(defaultValue);
+            } catch (NumberFormatException ignored) {
+                // 配置值非数字，继续后续兜底查找
             }
         }
 

@@ -1,6 +1,7 @@
 package com.cjym.videoweb.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -23,6 +24,7 @@ import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
+import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
@@ -31,7 +33,9 @@ import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.model.vo.WebConfigVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CategoryService;
+import com.cjym.videoweb.service.CommentService;
 import com.cjym.videoweb.service.VideoService;
+import com.cjym.videoweb.service.WatchHistoryService;
 import com.cjym.videoweb.utils.Base62Converter;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.SnowflakeIdGenerator;
@@ -84,6 +88,12 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Resource
     private FollowMapper followMapper;
+
+    @Resource
+    private WatchHistoryService watchHistoryService;
+
+    @Resource
+    private CommentService commentService;
 
     /**
      * 排序字段编码 → SELECT 别名 映射（1:总时长 2:播放量 3:收藏数 4:创建时间）
@@ -146,7 +156,105 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         // 填充当前用户是否已关注UP主的标记
         fillFollowStatus(result);
+        // 填充播放跳转链接
+        fillPlayLink(result);
         return result;
+    }
+
+    /**
+     * 为前台视频记录填充播放跳转链接：/{videoAvid}/episode/{episodeAvid}
+     * <p>
+     * episodeAvid 取自审核通过剧集中集数序号最大（最新更新）的一集，缺失时链接不填充
+     */
+    private void fillPlayLink(List<ClientVideoVo> vos) {
+        vos.forEach(vo -> {
+            if (vo.getAvid() != null && vo.getEpisodeAvid() != null) {
+                vo.setPlayLink("/client/video/" + vo.getAvid() + "/episode/" + vo.getEpisodeAvid());
+            }
+        });
+    }
+
+    @Override
+    public ClientVideoDetailVo getClientPlayDetail(String videoUid, String episodeUid) {
+        if (videoUid == null || videoUid.isBlank() || episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("视频avid和剧集avid不能为空");
+        }
+        // JOIN user_info 获取UP主最新信息
+        VideoVo videoVo = baseMapper.selectDetailByAvid(videoUid);
+        if (videoVo == null) {
+            throw new GlobeException("视频不存在");
+        }
+        // 前台仅可播放已发布的视频
+        if (videoVo.getVideoStatus() == null || videoVo.getVideoStatus() != VideoConstant.VIDEO_STATUS_PUBLISHED) {
+            throw new GlobeException("视频未发布，无法播放");
+        }
+        // 查询审核通过的剧集（前台仅展示审核通过的剧集）
+        LambdaQueryWrapper<VideoEpisode> epWrapper = new LambdaQueryWrapper<>();
+        epWrapper.eq(VideoEpisode::getVideoId, videoVo.getId())
+                .eq(VideoEpisode::getReviewStatus, VideoConstant.REVIEW_APPROVED)
+                .orderByAsc(VideoEpisode::getSort, VideoEpisode::getEpisodeNumber);
+        List<VideoEpisode> episodes = videoEpisodeMapper.selectList(epWrapper);
+        List<VideoEpisodeVo> episodeVos = episodes.stream().map(ep -> {
+            VideoEpisodeVo epVo = new VideoEpisodeVo();
+            BeanUtils.copyProperties(ep, epVo);
+            // 填充每集的播放跳转链接
+            if (videoVo.getAvid() != null && epVo.getAvid() != null) {
+                epVo.setPlayLink("/client/video/" + videoVo.getAvid() + "/episode/" + epVo.getAvid());
+            }
+            return epVo;
+        }).collect(Collectors.toList());
+        // 定位当前播放的剧集
+        VideoEpisode currentEpisodeEntity = episodes.stream()
+                .filter(ep -> episodeUid.equals(ep.getAvid()))
+                .findFirst()
+                .orElseThrow(() -> new GlobeException("剧集不存在或未通过审核"));
+        // 剧集播放数+1（SQL原子自增，避免并发丢失更新）
+        videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getId, currentEpisodeEntity.getId())
+                .setSql("play_count = play_count + 1"));
+        // 用户已登录时记录观看历史
+        watchHistoryService.recordPlay(videoVo.getId(), currentEpisodeEntity.getId());
+        VideoEpisodeVo currentEpisode = new VideoEpisodeVo();
+        BeanUtils.copyProperties(currentEpisodeEntity, currentEpisode);
+        // 当前剧集同样填充播放跳转链接
+        if (videoVo.getAvid() != null && currentEpisode.getAvid() != null) {
+            currentEpisode.setPlayLink("/client/video/" + videoVo.getAvid() + "/episode/" + currentEpisode.getAvid());
+        }
+        // 批量统计每集评论总数（前台可见口径：排除运营屏蔽），填充到每集
+        List<Long> episodeIds = episodes.stream().map(VideoEpisode::getId).collect(Collectors.toList());
+        Map<Long, Long> commentCountMap = commentService.getEpisodeCommentCounts(episodeIds);
+        episodeVos.forEach(epVo -> epVo.setCommentCount(commentCountMap.getOrDefault(epVo.getId(), 0L)));
+        currentEpisode.setCommentCount(commentCountMap.getOrDefault(currentEpisode.getId(), 0L));
+        // 组装播放详情
+        ClientVideoDetailVo detail = new ClientVideoDetailVo();
+        BeanUtils.copyProperties(videoVo, detail);
+        detail.setEpisodes(episodeVos);
+        detail.setCurrentEpisode(currentEpisode);
+        // 标签：从 Video 实体获取并转换
+        Video video = baseMapper.selectById(videoVo.getId());
+        detail.setTags(strToTags(video.getTags()));
+        // UP主个性签名（实时从 user_info 获取）
+        UserInfo up = userInfoMapper.selectById(videoVo.getUserId());
+        if (up != null) {
+            detail.setDescript(up.getDescript());
+        }
+        // 当前用户是否已关注该UP主
+        detail.setIsFollowed(isFollowedUp(videoVo.getUserId()));
+        return detail;
+    }
+
+    /**
+     * 判断当前用户是否已关注指定UP主（未登录返回 false）
+     */
+    private boolean isFollowedUp(Long followUserId) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null || followUserId == null) {
+            return false;
+        }
+        LambdaQueryWrapper<Follow> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Follow::getUserId, currentUserId)
+                .eq(Follow::getFollowUserId, followUserId);
+        return followMapper.selectCount(wrapper) > 0;
     }
 
     @Override

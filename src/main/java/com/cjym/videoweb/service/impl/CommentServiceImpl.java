@@ -10,15 +10,20 @@ import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.CommentLikeMapper;
 import com.cjym.videoweb.mapper.CommentMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
+import com.cjym.videoweb.mapper.VideoEpisodeMapper;
+import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.mapper.WebConfigMapper;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.entity.Video;
+import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
+import com.cjym.videoweb.model.vo.EpisodeCommentCountVo;
 import com.cjym.videoweb.model.vo.WebConfigVo;
 import com.cjym.videoweb.service.CommentService;
 import com.cjym.videoweb.utils.JWTUtil;
@@ -35,6 +40,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -58,6 +65,12 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     @Resource
     private WebConfigMapper webConfigMapper;
 
+    @Resource
+    private VideoMapper videoMapper;
+
+    @Resource
+    private VideoEpisodeMapper videoEpisodeMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CommentVo create(CommentSaveDto dto) {
@@ -74,6 +87,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
         Comment comment = new Comment();
         comment.setVideoId(dto.getVideoId());
+        comment.setEpisodeId(dto.getEpisodeId());
         comment.setUserId(currentUserId);
         comment.setContent(dto.getContent().trim());
 
@@ -95,6 +109,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             if (parentComment == null) {
                 throw new GlobeException("父评论不存在");
             }
+            // 回复继承父评论的剧集归属
+            comment.setEpisodeId(parentComment.getEpisodeId());
             comment.setRootId(parentComment.getRootId() != 0 ? parentComment.getRootId() : parentComment.getId());
             baseMapper.insert(comment);
 
@@ -127,14 +143,61 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     }
 
     @Override
-    public IPage<CommentVo> pageRootComments(Integer page, Integer size, Long videoId, String sortBy) {
+    public IPage<CommentVo> pageRootComments(Integer page, Integer size, Long videoId, Long episodeId, String sortBy) {
         if (videoId == null) {
             throw new GlobeException("视频ID不能为空");
         }
         Page<CommentVo> pageParam = new Page<>(page, size);
         Long currentUserId = getCurrentUserId();
         String safeSortBy = CommentConstant.SORT_BY_LIKE.equals(sortBy) ? CommentConstant.SORT_BY_LIKE : CommentConstant.SORT_BY_TIME;
-        return baseMapper.selectRootComments(pageParam, videoId, safeSortBy, currentUserId);
+        return baseMapper.selectRootComments(pageParam, videoId, episodeId, safeSortBy, currentUserId);
+    }
+
+    @Override
+    public IPage<CommentVo> pageCommentTree(Integer page, Integer size, String videoUid, String episodeUid, String sortBy) {
+        if (videoUid == null || videoUid.isBlank()) {
+            throw new GlobeException("视频avid不能为空");
+        }
+        if (episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        // 按 avid 解析视频与剧集
+        Video video = videoMapper.selectOne(new LambdaQueryWrapper<Video>().eq(Video::getAvid, videoUid));
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        VideoEpisode episode = videoEpisodeMapper.selectOne(new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null || !episode.getVideoId().equals(video.getId())) {
+            throw new GlobeException("剧集不存在或不属于该视频");
+        }
+        // 一级评论分页（排除运营屏蔽）
+        Page<CommentVo> pageParam = new Page<>(page, size);
+        Long currentUserId = getCurrentUserId();
+        String safeSortBy = CommentConstant.SORT_BY_LIKE.equals(sortBy) ? CommentConstant.SORT_BY_LIKE : CommentConstant.SORT_BY_TIME;
+        IPage<CommentVo> result = baseMapper.selectRootComments(pageParam, video.getId(), episode.getId(), safeSortBy, currentUserId);
+        // 批量加载该页一级评论的全部子回复并组装树
+        List<CommentVo> records = result.getRecords();
+        if (records.isEmpty()) {
+            return result;
+        }
+        List<Long> rootIds = records.stream().map(CommentVo::getId).collect(Collectors.toList());
+        List<CommentVo> allReplies = baseMapper.selectAllRepliesByRootIds(rootIds, currentUserId);
+        Map<Long, List<CommentVo>> childrenMap = allReplies.stream()
+                .collect(Collectors.groupingBy(CommentVo::getParentId, LinkedHashMap::new, Collectors.toList()));
+        records.forEach(root -> attachReplyTree(root, childrenMap));
+        return result;
+    }
+
+    /**
+     * 递归将子回复挂载到评论树上（childrenMap 按 parentId 分组，从根评论出发逐级挂载）
+     */
+    private void attachReplyTree(CommentVo node, Map<Long, List<CommentVo>> childrenMap) {
+        List<CommentVo> children = childrenMap.get(node.getId());
+        if (children == null) {
+            return;
+        }
+        node.setReplies(children);
+        children.forEach(child -> attachReplyTree(child, childrenMap));
     }
 
     @Override
@@ -144,6 +207,15 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         }
         Long currentUserId = getCurrentUserId();
         return baseMapper.selectReplies(rootId, currentUserId);
+    }
+
+    @Override
+    public Map<Long, Long> getEpisodeCommentCounts(List<Long> episodeIds) {
+        if (episodeIds == null || episodeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return baseMapper.selectEpisodeCommentCounts(episodeIds).stream()
+                .collect(Collectors.toMap(EpisodeCommentCountVo::getEpisodeId, EpisodeCommentCountVo::getCommentCount));
     }
 
     @Override
@@ -304,6 +376,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         CommentVo vo = new CommentVo();
         vo.setId(comment.getId());
         vo.setVideoId(comment.getVideoId());
+        vo.setEpisodeId(comment.getEpisodeId());
         vo.setUserId(comment.getUserId());
         vo.setParentId(comment.getParentId());
         vo.setRootId(comment.getRootId());

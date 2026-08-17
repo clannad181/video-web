@@ -95,6 +95,22 @@ public class WatchHistoryServiceImpl extends ServiceImpl<WatchHistoryMapper, Wat
     }
 
     @Override
+    public void recordPlay(Long videoId, Long episodeId) {
+        if (videoId == null) {
+            throw new GlobeException("视频ID不能为空");
+        }
+        // 未登录不记录观看历史
+        if (getCurrentUserId() == null) {
+            return;
+        }
+        WatchHistorySaveDto dto = new WatchHistorySaveDto();
+        dto.setVideoId(videoId);
+        dto.setEpisodeId(episodeId);
+        dto.setWatchedSeconds(0L);
+        record(dto);
+    }
+
+    @Override
     public IPage<WatchHistoryVo> pageHistory(Integer page, Integer size) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {

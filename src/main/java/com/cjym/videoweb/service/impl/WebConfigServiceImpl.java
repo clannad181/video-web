@@ -110,6 +110,43 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
     }
 
     @Override
+    public String getConfigValue(String category, String key) {
+        if (StringUtils.isEmpty(category) || StringUtils.isEmpty(key)) {
+            return null;
+        }
+        String redisKey = WEB_CONFIG_REDIS_KEY_PREFIX + category;
+
+        // 1. 优先从 Redis 读取该分类配置
+        String cached = stringRedisTemplate.opsForValue().get(redisKey);
+        List<WebConfigVo> configList = null;
+        if (StringUtils.isNotEmpty(cached)) {
+            try {
+                configList = objectMapper.readValue(cached,
+                        new TypeReference<List<WebConfigVo>>() {});
+            } catch (JsonProcessingException ignored) {
+                // 缓存数据异常，回源数据库
+            }
+        }
+
+        // 2. Redis 未命中或解析失败，回源数据库并回写缓存
+        if (configList == null) {
+            configList = loadConfigListFromDb(category);
+            try {
+                stringRedisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(configList));
+            } catch (JsonProcessingException ignored) {
+            }
+        }
+
+        // 3. 按 key 匹配配置值
+        for (WebConfigVo vo : configList) {
+            if (key.equals(vo.getKey()) && StringUtils.isNotEmpty(vo.getValue())) {
+                return vo.getValue();
+            }
+        }
+        return null;
+    }
+
+    @Override
     public R<String> update(List<WebConfigVo> configList) {
         if (configList == null || configList.isEmpty()) {
             return R.error("配置列表不能为空");

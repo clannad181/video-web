@@ -7,6 +7,7 @@ import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
+import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
@@ -35,6 +36,11 @@ public interface VideoService extends IService<Video> {
      * 前台视频推荐：已登录返回关注的UP主最新视频（不足时用最多收藏补齐），未登录返回最多收藏视频，最多6条
      */
     List<ClientVideoVo> recommend();
+
+    /**
+     * 前台视频播放详情：根据视频avid和剧集avid返回视频信息+审核通过剧集列表+当前剧集+UP主信息（仅限已发布视频）
+     */
+    ClientVideoDetailVo getClientPlayDetail(String videoUid, String episodeUid);
 
     /**
      * 查询视频详情（含剧集和标签）

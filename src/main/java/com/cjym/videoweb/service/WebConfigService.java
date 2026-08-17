@@ -18,4 +18,13 @@ public interface WebConfigService extends IService<WebConfig> {
      * 批量更新配置
      */
     R<String> update(List<WebConfigVo> configList);
+
+    /**
+     * 根据分类和键查询配置值（Redis缓存优先，未命中回源数据库）
+     *
+     * @param category 配置分类
+     * @param key      配置键
+     * @return 配置值，未找到返回null
+     */
+    String getConfigValue(String category, String key);
 }

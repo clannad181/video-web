@@ -7,6 +7,7 @@ import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
+import com.cjym.videoweb.model.vo.EpisodeCommentCountVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -17,10 +18,11 @@ import java.util.List;
 public interface CommentMapper extends BaseMapper<Comment> {
 
     /**
-     * 分页查询视频一级评论（JOIN user_info，支持按热度/时间排序）
+     * 分页查询视频一级评论（JOIN user_info，支持按热度/时间排序；episodeId 传则查剧集评论，不传则查视频级历史评论）
      */
     IPage<CommentVo> selectRootComments(Page<CommentVo> page,
                                          @Param("videoId") Long videoId,
+                                         @Param("episodeId") Long episodeId,
                                          @Param("sortBy") String sortBy,
                                          @Param("currentUserId") Long currentUserId);
 
@@ -29,6 +31,12 @@ public interface CommentMapper extends BaseMapper<Comment> {
      */
     List<CommentVo> selectReplies(@Param("rootId") Long rootId,
                                    @Param("currentUserId") Long currentUserId);
+
+    /**
+     * 批量查询多个根评论的全部子回复（按时间正序，用于树结构组装）
+     */
+    List<CommentVo> selectAllRepliesByRootIds(@Param("rootIds") List<Long> rootIds,
+                                               @Param("currentUserId") Long currentUserId);
 
     /**
      * 管理端多条件分页查询评论列表（含回复，支持按内容关键词、昵称、状态、视频ID、时间范围筛选）
@@ -69,4 +77,9 @@ public interface CommentMapper extends BaseMapper<Comment> {
      * 今日新增评论数（排除用户删除：status != 1）
      */
     Long selectTodayCommentCount();
+
+    /**
+     * 批量统计剧集评论总数（前台可见口径：status != 2，按 episode_id 分组）
+     */
+    List<EpisodeCommentCountVo> selectEpisodeCommentCounts(@Param("episodeIds") List<Long> episodeIds);
 }

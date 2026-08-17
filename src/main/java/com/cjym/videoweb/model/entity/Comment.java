@@ -19,6 +19,9 @@ public class Comment {
     @Schema(description = "所属视频ID")
     private Long videoId;
 
+    @Schema(description = "所属剧集ID（为空表示视频级历史评论）")
+    private Long episodeId;
+
     @Schema(description = "评论者用户ID")
     private Long userId;
 

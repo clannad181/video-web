@@ -32,6 +32,7 @@ import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EmailSendService;
 import com.cjym.videoweb.service.TokenExpiryConfigService;
 import com.cjym.videoweb.service.UserInfoService;
+import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.MD5Util;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -77,6 +78,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     @Resource
     private MenuMapper menuMapper;
+
+    @Resource
+    private WebConfigService webConfigService;
 
     private static final String fromEmail="2657463589@qq.com";
 
@@ -345,7 +349,11 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
             userInfo.setStatus(0);
         }
         if(userInfo.getType()==BaseConstant.USER_TYPE_USER) {
-            userInfo.setRoleId(BaseConstant.DEFAULT_FRONT_USER_ROLE_ID);
+            // 从web_config配置（Redis缓存优先）读取默认角色ID，未配置时回退常量默认值
+            String defaultRoleValue = webConfigService.getConfigValue(
+                    BaseConstant.WEB_CONFIG_CATEGORY_DEFAULT, BaseConstant.WEB_CONFIG_KEY_DEFAULT_ROLE);
+            userInfo.setRoleId(StringUtils.isNotEmpty(defaultRoleValue)
+                    ? Long.valueOf(defaultRoleValue) : BaseConstant.DEFAULT_FRONT_USER_ROLE_ID);
         }
         baseMapper.insert(userInfo);
         return R.success("新增用户成功");

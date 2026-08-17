@@ -17,6 +17,9 @@ public class CommentVo {
     @Schema(description = "视频ID")
     private Long videoId;
 
+    @Schema(description = "所属剧集ID（为空表示视频级历史评论）")
+    private Long episodeId;
+
     @Schema(description = "视频标题")
     private String videoTitle;
 

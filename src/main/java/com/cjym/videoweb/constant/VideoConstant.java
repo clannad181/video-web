@@ -10,6 +10,9 @@ public class VideoConstant {
     /** 审核状态最大值 */
     public static final int REVIEW_STATUS_MAX = REVIEW_REJECTED;
 
+    /** 视频状态：已发布（前台仅可播放已发布的视频） */
+    public static final int VIDEO_STATUS_PUBLISHED = 2;
+
     /** 前台视频排序类型：最新（按发布时间倒序） */
     public static final String SORT_LATEST = "latest";
     /** 前台视频排序类型：最火热（按播放量倒序） */

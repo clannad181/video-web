@@ -43,13 +43,14 @@ public class CommentController {
     }
 
     @GetMapping
-    @Operation(summary = "分页获取视频一级评论", description = "sortBy: like-按热度(点赞数)排序, time-按时间排序（默认）")
+    @Operation(summary = "分页获取视频一级评论", description = "sortBy: like-按热度(点赞数)排序, time-按时间排序（默认）；episodeId传则查剧集评论，不传则查视频级历史评论")
     public R<IPage<CommentVo>> list(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam Long videoId,
+            @RequestParam(required = false) Long episodeId,
             @RequestParam(required = false, defaultValue = "time") String sortBy) {
-        return R.success(commentService.pageRootComments(page, size, videoId, sortBy));
+        return R.success(commentService.pageRootComments(page, size, videoId, episodeId, sortBy));
     }
 
     @GetMapping("/replies/{rootId}")

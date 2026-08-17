@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.comment (
     id          BIGSERIAL PRIMARY KEY,
     video_id    BIGINT       NOT NULL,
+    episode_id  BIGINT,
     user_id     BIGINT       NOT NULL,
     parent_id   BIGINT       DEFAULT 0,
     root_id     BIGINT       DEFAULT 0,
@@ -16,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.comment (
 COMMENT ON TABLE  public.comment            IS '评论表';
 COMMENT ON COLUMN public.comment.id          IS '主键id';
 COMMENT ON COLUMN public.comment.video_id    IS '所属视频ID';
+COMMENT ON COLUMN public.comment.episode_id  IS '所属剧集ID（为空表示视频级历史评论）';
 COMMENT ON COLUMN public.comment.user_id     IS '评论者用户ID';
 COMMENT ON COLUMN public.comment.parent_id   IS '父评论ID，一级评论为0';
 COMMENT ON COLUMN public.comment.root_id     IS '根评论ID，一级评论root_id=id';
@@ -32,3 +34,5 @@ CREATE INDEX IF NOT EXISTS idx_comment_video_root_time ON public.comment(video_i
 CREATE INDEX IF NOT EXISTS idx_comment_user_time ON public.comment(user_id, create_time);
 -- 查询子回复
 CREATE INDEX IF NOT EXISTS idx_comment_root_parent ON public.comment(root_id, parent_id, id);
+-- 剧集评论查询索引
+CREATE INDEX IF NOT EXISTS idx_comment_episode_time ON public.comment(episode_id, create_time) WHERE episode_id IS NOT NULL;

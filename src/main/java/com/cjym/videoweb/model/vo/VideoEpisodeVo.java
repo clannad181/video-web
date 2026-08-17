@@ -49,6 +49,12 @@ public class VideoEpisodeVo {
     @Schema(description = "观看人数")
     private Long viewerCount;
 
+    @Schema(description = "播放跳转链接（如 /client/video/avXxx/episode/avYyy）")
+    private String playLink;
+
+    @Schema(description = "该剧集的评论总数（前台可见，排除运营屏蔽）")
+    private Long commentCount;
+
     // ========== 以下为关联视频信息（按avid跳转时填充） ==========
 
     @Schema(description = "关联视频标题")

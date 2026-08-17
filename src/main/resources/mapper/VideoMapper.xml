@@ -92,6 +92,7 @@
     <resultMap id="ClientVideoResultMap" type="com.cjym.videoweb.model.vo.ClientVideoVo">
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="avid" property="avid" jdbcType="VARCHAR"/>
+        <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
         <result column="title" property="title" jdbcType="VARCHAR"/>
         <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
         <result column="total_duration" property="totalDuration" jdbcType="BIGINT"/>
@@ -130,6 +131,9 @@
         SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
                COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
                COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
                v.is_ongoing, v.create_time, v.user_id,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid
@@ -151,6 +155,9 @@
         SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
                COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
                COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
                v.is_ongoing, v.create_time, v.user_id,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid

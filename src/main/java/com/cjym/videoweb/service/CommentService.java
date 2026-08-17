@@ -11,6 +11,7 @@ import com.cjym.videoweb.model.vo.CommentVo;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface CommentService extends IService<Comment> {
 
@@ -25,14 +26,24 @@ public interface CommentService extends IService<Comment> {
     void deleteByUser(Long commentId);
 
     /**
-     * 分页获取视频一级评论
+     * 分页获取视频一级评论（episodeId 传则查剧集评论，不传则查视频级历史评论）
      */
-    IPage<CommentVo> pageRootComments(Integer page, Integer size, Long videoId, String sortBy);
+    IPage<CommentVo> pageRootComments(Integer page, Integer size, Long videoId, Long episodeId, String sortBy);
+
+    /**
+     * 根据视频avid和剧集avid分页获取评论树（一级评论内嵌树形子回复）
+     */
+    IPage<CommentVo> pageCommentTree(Integer page, Integer size, String videoUid, String episodeUid, String sortBy);
 
     /**
      * 获取某根评论的所有子回复列表
      */
     List<CommentVo> getReplies(Long rootId);
+
+    /**
+     * 批量统计剧集评论总数（前台可见口径：status != 2），返回剧集ID → 评论数映射
+     */
+    Map<Long, Long> getEpisodeCommentCounts(List<Long> episodeIds);
 
     /**
      * 点赞/取消点赞（toggle）

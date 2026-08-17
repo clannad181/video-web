@@ -5,6 +5,7 @@
     <resultMap id="CommentVoResultMap" type="com.cjym.videoweb.model.vo.CommentVo">
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="video_id" property="videoId" jdbcType="BIGINT"/>
+        <result column="episode_id" property="episodeId" jdbcType="BIGINT"/>
         <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
         <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
         <result column="user_id" property="userId" jdbcType="BIGINT"/>
@@ -22,7 +23,7 @@
 
     <!-- 分页查询视频一级评论 -->
     <select id="selectRootComments" resultMap="CommentVoResultMap">
-        SELECT c.id, c.video_id, c.user_id, c.parent_id, c.root_id,
+        SELECT c.id, c.video_id, c.episode_id, c.user_id, c.parent_id, c.root_id,
                c.content, c.like_count, c.reply_count, c.status, c.create_time,
                u.nike_name, u.avatar,
                <if test="currentUserId != null">
@@ -40,6 +41,14 @@
           AND c.parent_id = 0
           AND c.status != 2
         <choose>
+            <when test="episodeId != null">
+                AND c.episode_id = #{episodeId}
+            </when>
+            <otherwise>
+                AND c.episode_id IS NULL
+            </otherwise>
+        </choose>
+        <choose>
             <when test="sortBy == 'like'">
                 ORDER BY c.like_count DESC, c.create_time DESC
             </when>
@@ -51,7 +60,7 @@
 
     <!-- 查询某根评论的所有子回复 -->
     <select id="selectReplies" resultMap="CommentVoResultMap">
-        SELECT c.id, c.video_id, c.user_id, c.parent_id, c.root_id,
+        SELECT c.id, c.video_id, c.episode_id, c.user_id, c.parent_id, c.root_id,
                c.content, c.like_count, c.reply_count, c.status, c.create_time,
                u.nike_name, u.avatar,
                <if test="currentUserId != null">
@@ -66,6 +75,31 @@
             LEFT JOIN public.comment_like cl ON c.id = cl.comment_id AND cl.user_id = #{currentUserId}
         </if>
         WHERE c.root_id = #{rootId}
+          AND c.parent_id != 0
+          AND c.status != 2
+        ORDER BY c.create_time ASC
+    </select>
+
+    <!-- 批量查询多个根评论的全部子回复（用于树结构组装） -->
+    <select id="selectAllRepliesByRootIds" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.episode_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               <if test="currentUserId != null">
+                   (CASE WHEN cl.status = 1 THEN TRUE ELSE FALSE END) AS liked
+               </if>
+               <if test="currentUserId == null">
+                   FALSE AS liked
+               </if>
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        <if test="currentUserId != null">
+            LEFT JOIN public.comment_like cl ON c.id = cl.comment_id AND cl.user_id = #{currentUserId}
+        </if>
+        WHERE c.root_id IN
+        <foreach collection="rootIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
           AND c.parent_id != 0
           AND c.status != 2
         ORDER BY c.create_time ASC
@@ -170,6 +204,20 @@
         FROM public.comment
         WHERE status != 1
           AND create_time::date = CURRENT_DATE
+    </select>
+
+    <!-- ==================== 批量统计剧集评论总数 ==================== -->
+
+    <select id="selectEpisodeCommentCounts" resultType="com.cjym.videoweb.model.vo.EpisodeCommentCountVo">
+        SELECT episode_id AS episode_id,
+               COUNT(*) AS comment_count
+        FROM public.comment
+        WHERE episode_id IN
+        <foreach collection="episodeIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+          AND status != 2
+        GROUP BY episode_id
     </select>
 
 </mapper>

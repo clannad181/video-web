@@ -10,6 +10,9 @@ public class CommentSaveDto {
     @Schema(description = "视频ID（必填）")
     private Long videoId;
 
+    @Schema(description = "剧集ID（剧集级评论时传，不传则视为视频级评论）")
+    private Long episodeId;
+
     @Schema(description = "父评论ID（回复时传，发表一级评论时不传或传0）")
     private Long parentId;
 

@@ -22,6 +22,11 @@ public interface WatchHistoryService extends IService<WatchHistory> {
     void record(WatchHistorySaveDto dto);
 
     /**
+     * 播放时记录观看历史（观看进度记0秒，未登录不记录）
+     */
+    void recordPlay(Long videoId, Long episodeId);
+
+    /**
      * 分页查询当前用户的观看历史
      */
     IPage<WatchHistoryVo> pageHistory(Integer page, Integer size);
