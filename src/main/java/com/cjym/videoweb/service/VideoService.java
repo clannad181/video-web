@@ -38,6 +38,11 @@ public interface VideoService extends IService<Video> {
     List<ClientVideoVo> recommend();
 
     /**
+     * 相关视频推荐分页：根据视频avid查询同UP主或标签有交集的视频（排除自身，仅已发布且至少有一集审核通过）
+     */
+    IPage<ClientVideoVo> pageRelatedVideos(Integer page, Integer size, String videoUid);
+
+    /**
      * 前台视频播放详情：根据视频avid和剧集avid返回视频信息+审核通过剧集列表+当前剧集+UP主信息（仅限已发布视频）
      */
     ClientVideoDetailVo getClientPlayDetail(String videoUid, String episodeUid);

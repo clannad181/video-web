@@ -5,6 +5,7 @@ import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,5 +39,14 @@ public class ClientVideoController {
     @Operation(summary = "视频推荐", description = "已登录：返回所有关注UP主的最新视频6条，关注视频不足6条（含关注数为0）时用最多收藏的视频补齐；未登录：返回最多收藏的视频")
     public R<List<ClientVideoVo>> recommend() {
         return R.success(videoService.recommend());
+    }
+
+    @GetMapping("/related")
+    @Operation(summary = "相关视频推荐", description = "根据视频avid推荐相关视频：同UP主优先、标签有交集的视频补充，排除自身，仅已发布且至少有一集审核通过，再按播放量降序")
+    public R<IPage<ClientVideoVo>> related(
+            @Parameter(description = "当前视频avid") @RequestParam String videoUid,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
+        return R.success(videoService.pageRelatedVideos(page, size, videoUid));
     }
 }

@@ -7,6 +7,6 @@ import lombok.Data;
 @Schema(description = "关注UP主请求")
 public class FollowSaveDto {
 
-    @Schema(description = "被关注的UP主用户id")
-    private Long followUserId;
+    @Schema(description = "被关注的UP主uid")
+    private String followUserUid;
 }

@@ -25,8 +25,8 @@ public class R<T> {
 
   public static<T> R<T> success(Boolean flag){
     R<Boolean> r = new R<>();
-    r.setCode(ResultEnum.EMAIL_SEND.getCode());
-    r.setMessage(ResultEnum.EMAIL_SEND.getMessage());
+    r.setCode(ResultEnum.SUCCESS.getCode());
+    r.setMessage(ResultEnum.SUCCESS.getMessage());
     r.setData(flag);
     return (R<T>) r;
   }

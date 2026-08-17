@@ -161,6 +161,24 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         return result;
     }
 
+    @Override
+    public IPage<ClientVideoVo> pageRelatedVideos(Integer page, Integer size, String videoUid) {
+        if (videoUid == null || videoUid.isBlank()) {
+            throw new GlobeException("视频avid不能为空");
+        }
+        // 按 avid 查询当前视频（拿 UP主id 和标签）
+        Video video = baseMapper.selectOne(new LambdaQueryWrapper<Video>().eq(Video::getAvid, videoUid));
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        Page<ClientVideoVo> pageParam = new Page<>(page, size);
+        IPage<ClientVideoVo> result = baseMapper.selectRelatedVideoPage(pageParam, video.getId(), video.getUserId(), video.getTags());
+        // 填充播放跳转链接与关注标记
+        fillPlayLink(result.getRecords());
+        fillFollowStatus(result.getRecords());
+        return result;
+    }
+
     /**
      * 为前台视频记录填充播放跳转链接：/{videoAvid}/episode/{episodeAvid}
      * <p>

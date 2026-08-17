@@ -23,14 +23,13 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     private UserInfoMapper userInfoMapper;
 
     @Override
-    public void follow(Long followUserId) {
+    public void follow(String followUserUid) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
             throw new GlobeException("请先登录");
         }
-        if (followUserId == null) {
-            throw new GlobeException("UP主ID不能为空");
-        }
+        // 按 uid 解析 UP主主键id（避免主键在网络上传输）
+        Long followUserId = resolveFollowUserId(followUserUid);
         if (currentUserId.equals(followUserId)) {
             throw new GlobeException("不能关注自己");
         }
@@ -52,14 +51,12 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     }
 
     @Override
-    public void unfollow(Long followUserId) {
+    public void unfollow(String followUserUid) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
             throw new GlobeException("请先登录");
         }
-        if (followUserId == null) {
-            throw new GlobeException("UP主ID不能为空");
-        }
+        Long followUserId = resolveFollowUserId(followUserUid);
         LambdaQueryWrapper<Follow> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Follow::getUserId, currentUserId)
                 .eq(Follow::getFollowUserId, followUserId);
@@ -68,9 +65,16 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     }
 
     @Override
-    public boolean isFollowed(Long followUserId) {
+    public boolean isFollowed(String followUserUid) {
         Long currentUserId = getCurrentUserId();
-        if (currentUserId == null || followUserId == null) {
+        if (currentUserId == null) {
+            return false;
+        }
+        // 查询失败（uid为空或UP主不存在）视为未关注
+        Long followUserId;
+        try {
+            followUserId = resolveFollowUserId(followUserUid);
+        } catch (GlobeException e) {
             return false;
         }
         LambdaQueryWrapper<Follow> wrapper = new LambdaQueryWrapper<>();
@@ -79,7 +83,20 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         return baseMapper.selectCount(wrapper) > 0;
     }
 
-    // ==================== 私有方法 ====================
+
+    /**
+     * 按 uid 解析 UP主主键id（uid为空或用户不存在时抛错）
+     */
+    private Long resolveFollowUserId(String followUserUid) {
+        if (followUserUid == null || followUserUid.isBlank()) {
+            throw new GlobeException("UP主uid不能为空");
+        }
+        UserInfo followUser = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, followUserUid));
+        if (followUser == null) {
+            throw new GlobeException("UP主不存在");
+        }
+        return followUser.getId();
+    }
 
     /**
      * 从请求 JWT token 中获取当前用户ID

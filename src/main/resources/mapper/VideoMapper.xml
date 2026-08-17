@@ -126,6 +126,35 @@
         ORDER BY ${orderColumn} DESC
     </select>
 
+    <!-- 相关视频推荐分页：同UP主或标签有交集的视频，排除自身，同UP主优先再按播放量降序 -->
+    <select id="selectRelatedVideoPage" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND v.id != #{videoId}
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+          AND (
+              v.user_id = #{userId}
+              <if test="tags != null and tags != ''">
+                  OR (v.tags IS NOT NULL AND v.tags != ''
+                      AND string_to_array(v.tags, ',') &amp;&amp; string_to_array(#{tags}, ','))
+              </if>
+          )
+        ORDER BY (v.user_id = #{userId}) DESC, play_count DESC
+    </select>
+
     <!-- 前台推荐：关注的UP主最新视频（已发布且至少有一集审核通过） -->
     <select id="selectFollowLatest" resultMap="ClientVideoResultMap">
         SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
