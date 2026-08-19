@@ -39,7 +39,7 @@
         </if>
         WHERE c.video_id = #{videoId}
           AND c.parent_id = 0
-          AND c.status != 2
+          AND c.status = 0
         <choose>
             <when test="episodeId != null">
                 AND c.episode_id = #{episodeId}
@@ -76,7 +76,7 @@
         </if>
         WHERE c.root_id = #{rootId}
           AND c.parent_id != 0
-          AND c.status != 2
+          AND c.status = 0
         ORDER BY c.create_time ASC
     </select>
 
@@ -101,7 +101,7 @@
             #{id}
         </foreach>
           AND c.parent_id != 0
-          AND c.status != 2
+          AND c.status = 0
         ORDER BY c.create_time ASC
     </select>
 
@@ -216,7 +216,7 @@
         <foreach collection="episodeIds" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
-          AND status != 2
+          AND status = 0
         GROUP BY episode_id
     </select>
 

@@ -42,13 +42,17 @@ public interface VideoMapper extends BaseMapper<Video> {
                                                @Param("orderColumn") String orderColumn);
 
     /**
-     * 相关视频推荐分页：同UP主或标签有交集的视频，排除自身，仅已发布且至少有一集审核通过，
-     * 同UP主的视频优先，再按播放量降序
+     * 相关视频推荐第一步：查询候选视频id列表（同UP主或标签有交集，排除自身，仅已发布且至少有一集审核通过）
      */
-    IPage<ClientVideoVo> selectRelatedVideoPage(Page<ClientVideoVo> page,
-                                                @Param("videoId") Long videoId,
-                                                @Param("userId") Long userId,
-                                                @Param("tags") String tags);
+    List<Long> selectRelatedVideoIds(@Param("videoId") Long videoId,
+                                     @Param("userId") Long userId,
+                                     @Param("tags") String tags,
+                                     @Param("limit") int limit);
+
+    /**
+     * 相关视频推荐第二步：按id列表批量查询前台视频信息（含播放量聚合、最新更新剧集avid、分类和UP主信息）
+     */
+    List<ClientVideoVo> selectClientVideoByIds(@Param("ids") List<Long> ids);
 
     /**
      * 查询关注UP主的最新视频（已发布且至少有一集审核通过），按发布时间倒序

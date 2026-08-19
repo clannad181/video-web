@@ -13,6 +13,7 @@ import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.mapper.WebConfigMapper;
+import com.cjym.videoweb.model.dto.CommentClientSaveDto;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
@@ -96,7 +97,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         comment.setParentId(parentId);
 
         // 根据 comment_review 配置决定评论状态：免审则直接正常，否则进入待审核
-        comment.setStatus(isCommentAutoReviewEnabled() ? CommentConstant.STATUS_NORMAL : CommentConstant.STATUS_PENDING_REVIEW);
+        comment.setStatus(isCommentAutoReviewEnabled() ? CommentConstant.STATUS_PENDING_REVIEW : CommentConstant.STATUS_NORMAL );
 
         if (parentId == 0L) {
             // 一级评论：root_id 先占位，insert 后回写
@@ -120,6 +121,53 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         }
 
         return toCommentVo(comment);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommentVo createClient(CommentClientSaveDto dto) {
+        if (dto.getVideoUid() == null || dto.getVideoUid().isBlank()) {
+            throw new GlobeException("视频avid不能为空");
+        }
+        if (dto.getEpisodeUid() == null || dto.getEpisodeUid().isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        if (dto.getContent() == null || dto.getContent().isBlank()) {
+            throw new GlobeException("评论内容不能为空");
+        }
+        // 按 avid 解析视频与剧集
+        Video video = videoMapper.selectOne(new LambdaQueryWrapper<Video>().eq(Video::getAvid, dto.getVideoUid()));
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        VideoEpisode episode = videoEpisodeMapper.selectOne(new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, dto.getEpisodeUid()));
+        if (episode == null || !episode.getVideoId().equals(video.getId())) {
+            throw new GlobeException("剧集不存在或不属于该视频");
+        }
+        // 回复校验：父评论必须存在且属于该视频，防止跨视频伪造回复
+        if (dto.getParentId() != null && dto.getParentId() != 0L) {
+            Comment parentComment = baseMapper.selectById(dto.getParentId());
+            if (parentComment == null) {
+                throw new GlobeException("父评论不存在");
+            }
+            if (!parentComment.getVideoId().equals(video.getId())) {
+                throw new GlobeException("父评论不属于该视频");
+            }
+        }
+        // 组装内部 DTO 复用现有发表逻辑
+        CommentSaveDto saveDto = new CommentSaveDto();
+        saveDto.setVideoId(video.getId());
+        saveDto.setEpisodeId(episode.getId());
+        saveDto.setParentId(dto.getParentId());
+        saveDto.setContent(dto.getContent());
+        CommentVo vo = create(saveDto);
+        // 填充评论者昵称与头像，便于前端发布后直接上屏展示
+        UserInfo currentUser = userInfoMapper.selectById(vo.getUserId());
+        if (currentUser != null) {
+            vo.setNickName(currentUser.getNikeName());
+            vo.setAvatar(currentUser.getAvatar());
+        }
+        return vo;
     }
 
     @Override
@@ -366,7 +414,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         wrapper.eq(WebConfig::getCategory, BaseConstant.WEB_CONFIG_CATEGORY_REVIEW)
                 .eq(WebConfig::getKey, BaseConstant.WEB_CONFIG_KEY_COMMENT_REVIEW);
         WebConfig config = webConfigMapper.selectOne(wrapper);
-        return config != null && BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(config.getValue());
+        return config != null && !BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(config.getValue());
     }
 
     /**

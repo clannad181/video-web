@@ -39,7 +39,7 @@ public class ClientUserController {
         return userInfoService.login(userLoginVo);
     }
 
-        @GetMapping("/userInfo")
+    @GetMapping("/userInfo")
     @Operation(summary = "获取前台用户基础信息", description = "获取当前登录前台用户的基础信息（不含角色和菜单）")
     public R<ClientUserVo> getUserInfo(HttpServletRequest request) {
         return userInfoService.getClientUserInfo(request);

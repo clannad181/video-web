@@ -42,7 +42,7 @@ public class ClientVideoController {
     }
 
     @GetMapping("/related")
-    @Operation(summary = "相关视频推荐", description = "根据视频avid推荐相关视频：同UP主优先、标签有交集的视频补充，排除自身，仅已发布且至少有一集审核通过，再按播放量降序")
+    @Operation(summary = "相关视频推荐", description = "根据视频avid推荐相关视频：同UP主优先、标签有交集的视频补充（标签为后台查询数据库得到的当前视频标签，逗号分割），排除自身，仅已发布且至少有一集审核通过，再按播放量降序")
     public R<IPage<ClientVideoVo>> related(
             @Parameter(description = "当前视频avid") @RequestParam String videoUid,
             @RequestParam(defaultValue = "1") Integer page,

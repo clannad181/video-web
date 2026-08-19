@@ -1,0 +1,339 @@
+package com.cjym.videoweb.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.cjym.videoweb.constant.CommentConstant;
+import com.cjym.videoweb.exception.GlobeException;
+import com.cjym.videoweb.mapper.EpisodeCoinMapper;
+import com.cjym.videoweb.mapper.EpisodeFavoriteMapper;
+import com.cjym.videoweb.mapper.EpisodeLikeMapper;
+import com.cjym.videoweb.mapper.UserInfoMapper;
+import com.cjym.videoweb.mapper.VideoEpisodeMapper;
+import com.cjym.videoweb.model.entity.EpisodeCoin;
+import com.cjym.videoweb.model.entity.EpisodeFavorite;
+import com.cjym.videoweb.model.entity.EpisodeLike;
+import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.entity.VideoEpisode;
+import com.cjym.videoweb.model.vo.EpisodeActionStatusVo;
+import com.cjym.videoweb.model.vo.EpisodeActionVo;
+import com.cjym.videoweb.model.vo.EpisodeFavoriteStatusVo;
+import com.cjym.videoweb.service.EpisodeActionService;
+import com.cjym.videoweb.utils.JWTUtil;
+import io.micrometer.common.util.StringUtils;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+@Service
+public class EpisodeActionServiceImpl implements EpisodeActionService {
+
+    @Resource
+    private EpisodeLikeMapper episodeLikeMapper;
+
+    @Resource
+    private EpisodeCoinMapper episodeCoinMapper;
+
+    @Resource
+    private VideoEpisodeMapper videoEpisodeMapper;
+
+    @Resource
+    private EpisodeFavoriteMapper episodeFavoriteMapper;
+
+    @Resource
+    private UserInfoMapper userInfoMapper;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EpisodeActionVo toggleLike(String episodeUid) {
+        if (episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        // 按 avid 查询剧集
+        VideoEpisode episode = videoEpisodeMapper.selectOne(
+                new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+
+        Long episodeId = episode.getId();
+        // 查询是否已点赞
+        LambdaQueryWrapper<EpisodeLike> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EpisodeLike::getEpisodeId, episodeId)
+                .eq(EpisodeLike::getUserId, currentUserId);
+        EpisodeLike existingLike = episodeLikeMapper.selectOne(wrapper);
+
+        boolean isLiked;
+        long likeCount;
+
+        if (existingLike != null) {
+            // toggle：已点赞 → 取消，已取消 → 点赞
+            if (existingLike.getStatus() == CommentConstant.LIKE_ACTIVE) {
+                existingLike.setStatus(CommentConstant.LIKE_CANCELLED);
+                episodeLikeMapper.updateById(existingLike);
+                // 剧集点赞数 -1
+                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                        .eq(VideoEpisode::getId, episodeId)
+                        .setSql("like_count = like_count - 1"));
+                isLiked = false;
+            } else {
+                existingLike.setStatus(CommentConstant.LIKE_ACTIVE);
+                episodeLikeMapper.updateById(existingLike);
+                // 剧集点赞数 +1
+                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                        .eq(VideoEpisode::getId, episodeId)
+                        .setSql("like_count = like_count + 1"));
+                isLiked = true;
+            }
+        } else {
+            // 首次点赞
+            EpisodeLike like = new EpisodeLike();
+            like.setEpisodeId(episodeId);
+            like.setUserId(currentUserId);
+            like.setStatus(CommentConstant.LIKE_ACTIVE);
+            episodeLikeMapper.insert(like);
+            // 剧集点赞数 +1
+            videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                    .eq(VideoEpisode::getId, episodeId)
+                    .setSql("like_count = like_count + 1"));
+            isLiked = true;
+        }
+
+        // 查询最新点赞数
+        VideoEpisode updatedEpisode = videoEpisodeMapper.selectById(episodeId);
+        likeCount = updatedEpisode != null && updatedEpisode.getLikeCount() != null
+                ? updatedEpisode.getLikeCount() : 0L;
+
+        EpisodeActionVo vo = new EpisodeActionVo();
+        vo.setCount(likeCount);
+        vo.setIsActioned(isLiked);
+        return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EpisodeActionVo coin(String episodeUid) {
+        if (episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        // 按 avid 查询剧集
+        VideoEpisode episode = videoEpisodeMapper.selectOne(
+                new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+
+        Long episodeId = episode.getId();
+        // 查询是否已投币（每个用户每集只能投币一次，不可取消）
+        LambdaQueryWrapper<EpisodeCoin> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EpisodeCoin::getEpisodeId, episodeId)
+                .eq(EpisodeCoin::getUserId, currentUserId);
+        EpisodeCoin existingCoin = episodeCoinMapper.selectOne(wrapper);
+
+        if (existingCoin != null) {
+            throw new GlobeException("您已经投过币了，每集只能投币一次");
+        }
+
+        // 新增投币记录
+        EpisodeCoin coin = new EpisodeCoin();
+        coin.setEpisodeId(episodeId);
+        coin.setUserId(currentUserId);
+        coin.setCoinCount(1);
+        episodeCoinMapper.insert(coin);
+
+        // 剧集投币数 +1
+        videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getId, episodeId)
+                .setSql("coin_count = coin_count + 1"));
+
+        // 查询最新投币数
+        VideoEpisode updatedEpisode = videoEpisodeMapper.selectById(episodeId);
+        long coinCount = updatedEpisode != null && updatedEpisode.getCoinCount() != null
+                ? updatedEpisode.getCoinCount() : 0L;
+
+        EpisodeActionVo vo = new EpisodeActionVo();
+        vo.setCount(coinCount);
+        vo.setIsActioned(true);
+        return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EpisodeActionVo toggleFavorite(String episodeUid) {
+        if (episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        // 按 avid 查询剧集
+        VideoEpisode episode = videoEpisodeMapper.selectOne(
+                new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+
+        Long episodeId = episode.getId();
+        // 查询是否已收藏
+        LambdaQueryWrapper<EpisodeFavorite> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EpisodeFavorite::getEpisodeId, episodeId)
+                .eq(EpisodeFavorite::getUserId, currentUserId);
+        EpisodeFavorite existingFavorite = episodeFavoriteMapper.selectOne(wrapper);
+
+        boolean isFavorited;
+        long favoriteCount;
+
+        if (existingFavorite != null) {
+            // toggle：已收藏 → 取消，已取消 → 收藏
+            if (existingFavorite.getStatus() == CommentConstant.LIKE_ACTIVE) {
+                existingFavorite.setStatus(CommentConstant.LIKE_CANCELLED);
+                episodeFavoriteMapper.updateById(existingFavorite);
+                // 剧集收藏数 -1
+                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                        .eq(VideoEpisode::getId, episodeId)
+                        .setSql("favorite_count = favorite_count - 1"));
+                isFavorited = false;
+            } else {
+                existingFavorite.setStatus(CommentConstant.LIKE_ACTIVE);
+                episodeFavoriteMapper.updateById(existingFavorite);
+                // 剧集收藏数 +1
+                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                        .eq(VideoEpisode::getId, episodeId)
+                        .setSql("favorite_count = favorite_count + 1"));
+                isFavorited = true;
+            }
+        } else {
+            // 首次收藏
+            EpisodeFavorite favorite = new EpisodeFavorite();
+            favorite.setEpisodeId(episodeId);
+            favorite.setUserId(currentUserId);
+            favorite.setStatus(CommentConstant.LIKE_ACTIVE);
+            episodeFavoriteMapper.insert(favorite);
+            // 剧集收藏数 +1
+            videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                    .eq(VideoEpisode::getId, episodeId)
+                    .setSql("favorite_count = favorite_count + 1"));
+            isFavorited = true;
+        }
+
+        // 查询最新收藏数
+        VideoEpisode updatedEpisode = videoEpisodeMapper.selectById(episodeId);
+        favoriteCount = updatedEpisode != null && updatedEpisode.getFavoriteCount() != null
+                ? updatedEpisode.getFavoriteCount() : 0L;
+
+        EpisodeActionVo vo = new EpisodeActionVo();
+        vo.setCount(favoriteCount);
+        vo.setIsActioned(isFavorited);
+        return vo;
+    }
+
+    @Override
+    public EpisodeActionStatusVo getActionStatus(String episodeUid) {
+        if (episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        // 按 avid 查询剧集
+        VideoEpisode episode = videoEpisodeMapper.selectOne(
+                new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+
+        Long episodeId = episode.getId();
+        EpisodeActionStatusVo vo = new EpisodeActionStatusVo();
+        vo.setIsLiked(isLiked(episodeId));
+        vo.setIsCoined(isCoined(episodeId));
+        return vo;
+    }
+
+    @Override
+    public EpisodeFavoriteStatusVo getFavoriteStatus(String episodeUid) {
+        if (episodeUid == null || episodeUid.isBlank()) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        // 按 avid 查询剧集
+        VideoEpisode episode = videoEpisodeMapper.selectOne(
+                new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+
+        EpisodeFavoriteStatusVo vo = new EpisodeFavoriteStatusVo();
+        vo.setIsFavorited(isFavorited(episode.getId()));
+        return vo;
+    }
+
+    @Override
+    public boolean isLiked(Long episodeId) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null || episodeId == null) {
+            return false;
+        }
+        LambdaQueryWrapper<EpisodeLike> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EpisodeLike::getEpisodeId, episodeId)
+                .eq(EpisodeLike::getUserId, currentUserId)
+                .eq(EpisodeLike::getStatus, CommentConstant.LIKE_ACTIVE);
+        return episodeLikeMapper.selectCount(wrapper) > 0;
+    }
+
+    @Override
+    public boolean isCoined(Long episodeId) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null || episodeId == null) {
+            return false;
+        }
+        LambdaQueryWrapper<EpisodeCoin> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EpisodeCoin::getEpisodeId, episodeId)
+                .eq(EpisodeCoin::getUserId, currentUserId);
+        return episodeCoinMapper.selectCount(wrapper) > 0;
+    }
+
+    @Override
+    public boolean isFavorited(Long episodeId) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null || episodeId == null) {
+            return false;
+        }
+        LambdaQueryWrapper<EpisodeFavorite> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EpisodeFavorite::getEpisodeId, episodeId)
+                .eq(EpisodeFavorite::getUserId, currentUserId)
+                .eq(EpisodeFavorite::getStatus, CommentConstant.LIKE_ACTIVE);
+        return episodeFavoriteMapper.selectCount(wrapper) > 0;
+    }
+
+    /**
+     * 从请求 JWT token 中获取当前用户ID
+     */
+    private Long getCurrentUserId() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes == null) {
+                return null;
+            }
+            HttpServletRequest request = attributes.getRequest();
+            String token = request.getHeader("authorization");
+            if (StringUtils.isEmpty(token)) {
+                return null;
+            }
+            if (token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+            String username = JWTUtil.getUsername(token);
+            UserInfo userInfo = userInfoMapper.selectByUserName(username);
+            return userInfo != null ? userInfo.getId() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+}

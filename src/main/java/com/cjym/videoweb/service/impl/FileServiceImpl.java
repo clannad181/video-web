@@ -389,7 +389,7 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
                 }
             }
         } catch (IOException e) {
-            throw new RuntimeException("文件预览失败: " + e.getMessage());
+//            throw new RuntimeException("文件预览失败: " + e.getMessage());
         }
     }
 

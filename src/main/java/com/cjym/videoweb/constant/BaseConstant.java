@@ -58,6 +58,11 @@ public class BaseConstant {
      */
     public static final Integer VIDEO_RECOMMEND_SIZE = 6;
 
+    /**
+     * 相关视频推荐候选视频数量上限（先查候选id再批量查详情，防止候选集合过大）
+     */
+    public static final Integer RELATED_VIDEO_CANDIDATE_LIMIT = 500;
+
     // ==================== Token 有效期配置 key（存放在 web_config 表） ====================
     /** 前台 Access Token 有效期配置键 */
     public static final String FRONT_ACCESS_TOKEN_EXPIRY = "front_access_token_expiry";

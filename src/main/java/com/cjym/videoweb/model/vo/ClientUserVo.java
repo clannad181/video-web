@@ -42,4 +42,10 @@ public class ClientUserVo {
 
     @Schema(description = "性别")
     private Boolean sex;
+
+    @Schema(description = "关注数")
+    private Long followCount;
+
+    @Schema(description = "粉丝数")
+    private Long fansCount;
 }

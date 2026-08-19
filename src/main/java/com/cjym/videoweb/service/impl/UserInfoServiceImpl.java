@@ -9,12 +9,14 @@ import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.CaptchaConstant;
 import com.cjym.videoweb.enums.ResultEnum;
 import com.cjym.videoweb.exception.GlobeException;
+import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.MenuMapper;
 import com.cjym.videoweb.mapper.RoleMapper;
 import com.cjym.videoweb.mapper.RoleMenuBindMapper;
 import com.cjym.videoweb.model.dto.MenuDto;
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.dto.UserPageDto;
+import com.cjym.videoweb.model.entity.Follow;
 import com.cjym.videoweb.model.entity.Menu;
 import com.cjym.videoweb.model.entity.Role;
 import com.cjym.videoweb.model.entity.RoleMenuBind;
@@ -78,6 +80,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     @Resource
     private MenuMapper menuMapper;
+
+    @Resource
+    private FollowMapper followMapper;
 
     @Resource
     private WebConfigService webConfigService;
@@ -255,6 +260,13 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
         ClientUserVo vo = new ClientUserVo();
         BeanUtils.copyProperties(userInfo, vo);
+        // 统计关注数与粉丝数（@TableLogic 自动过滤已取关记录）
+        Long followCount = followMapper.selectCount(new LambdaQueryWrapper<Follow>()
+                .eq(Follow::getUserId, userInfo.getId()));
+        Long fansCount = followMapper.selectCount(new LambdaQueryWrapper<Follow>()
+                .eq(Follow::getFollowUserId, userInfo.getId()));
+        vo.setFollowCount(followCount);
+        vo.setFansCount(fansCount);
         return R.success(vo);
     }
 

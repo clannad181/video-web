@@ -2,6 +2,7 @@ package com.cjym.videoweb.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.cjym.videoweb.model.dto.CommentClientSaveDto;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
@@ -19,6 +20,11 @@ public interface CommentService extends IService<Comment> {
      * 发表评论/回复
      */
     CommentVo create(CommentSaveDto dto);
+
+    /**
+     * 前台发表评论/回复（基于视频avid与剧集avid标识）
+     */
+    CommentVo createClient(CommentClientSaveDto dto);
 
     /**
      * 用户删除自己的评论（软删 status=1）

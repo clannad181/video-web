@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.ReportMapper">
+
+    <resultMap id="ReportVoResultMap" type="com.cjym.videoweb.model.vo.ReportVo">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="video_id" property="videoId" jdbcType="BIGINT"/>
+        <result column="video_avid" property="videoAvid" jdbcType="VARCHAR"/>
+        <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
+        <result column="episode_id" property="episodeId" jdbcType="BIGINT"/>
+        <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
+        <result column="episode_title" property="episodeTitle" jdbcType="VARCHAR"/>
+        <result column="reporter_id" property="reporterId" jdbcType="BIGINT"/>
+        <result column="reporter_nike_name" property="reporterNickName" jdbcType="VARCHAR"/>
+        <result column="report_type" property="reportType" jdbcType="INTEGER"/>
+        <result column="reason" property="reason" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="handler_id" property="handlerId" jdbcType="BIGINT"/>
+        <result column="handler_nike_name" property="handlerNickName" jdbcType="VARCHAR"/>
+        <result column="handler_note" property="handlerNote" jdbcType="VARCHAR"/>
+        <result column="handle_time" property="handleTime" jdbcType="TIMESTAMP"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 管理端举报列表：LEFT JOIN 视频/剧集/举报人/处理人信息，按创建时间倒序 -->
+    <select id="selectReportPage" resultMap="ReportVoResultMap">
+        SELECT r.id, r.video_id, r.episode_id, r.reporter_id, r.report_type, r.reason,
+               r.status, r.handler_id, r.handler_note, r.handle_time, r.create_time,
+               v.avid AS video_avid, v.title AS video_title,
+               e.avid AS episode_avid, e.title AS episode_title,
+               ru.nike_name AS reporter_nike_name,
+               hu.nike_name AS handler_nike_name
+        FROM public.report r
+        LEFT JOIN public.video_info v ON v.id = r.video_id
+        LEFT JOIN public.video_episode e ON e.id = r.episode_id
+        LEFT JOIN public.user_info ru ON ru.id = r.reporter_id
+        LEFT JOIN public.user_info hu ON hu.id = r.handler_id
+        <where>
+            <if test="status != null">
+                AND r.status = #{status}
+            </if>
+            <if test="reportType != null">
+                AND r.report_type = #{reportType}
+            </if>
+            <if test="videoTitle != null and videoTitle != ''">
+                AND v.title LIKE CONCAT('%', #{videoTitle}, '%')
+            </if>
+            <if test="reporterNickName != null and reporterNickName != ''">
+                AND ru.nike_name LIKE CONCAT('%', #{reporterNickName}, '%')
+            </if>
+        </where>
+        ORDER BY r.create_time DESC
+    </select>
+
+</mapper>

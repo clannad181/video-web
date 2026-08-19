@@ -55,6 +55,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -166,13 +167,33 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (videoUid == null || videoUid.isBlank()) {
             throw new GlobeException("视频avid不能为空");
         }
-        // 按 avid 查询当前视频（拿 UP主id 和标签）
+        // 第一步：按 avid 查询当前视频（拿 UP主id 和标签）
         Video video = baseMapper.selectOne(new LambdaQueryWrapper<Video>().eq(Video::getAvid, videoUid));
         if (video == null) {
             throw new GlobeException("视频不存在");
         }
-        Page<ClientVideoVo> pageParam = new Page<>(page, size);
-        IPage<ClientVideoVo> result = baseMapper.selectRelatedVideoPage(pageParam, video.getId(), video.getUserId(), video.getTags());
+        // 第二步：查询候选视频id列表（同UP主或标签有交集，标签取自数据库查询到的当前视频tags，排除自身，仅已发布且至少一集审核通过）
+        List<Long> candidateIds = baseMapper.selectRelatedVideoIds(video.getId(), video.getUserId(),
+                video.getTags(), BaseConstant.RELATED_VIDEO_CANDIDATE_LIMIT);
+        Page<ClientVideoVo> result = new Page<>(page, size);
+        if (candidateIds.isEmpty()) {
+            result.setTotal(0);
+            return result;
+        }
+        // 第三步：按候选id批量查询前台视频信息
+        List<ClientVideoVo> records = baseMapper.selectClientVideoByIds(candidateIds);
+        // 第四步：内存排序（同UP主优先，再按播放量降序）
+        Long upUserId = video.getUserId();
+        records.sort(Comparator
+                .comparing((ClientVideoVo vo) -> !upUserId.equals(vo.getUserId()))
+                .thenComparing(vo -> vo.getPlayCount() == null ? 0L : vo.getPlayCount(),
+                        Comparator.reverseOrder()));
+        // 第五步：内存分页（避免分页插件对复杂SQL做count优化）
+        long total = records.size();
+        int fromIndex = (int) Math.min((long) (page - 1) * size, total);
+        int toIndex = (int) Math.min((long) fromIndex + size, total);
+        result.setRecords(records.subList(fromIndex, toIndex));
+        result.setTotal(total);
         // 填充播放跳转链接与关注标记
         fillPlayLink(result.getRecords());
         fillFollowStatus(result.getRecords());
