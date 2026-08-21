@@ -23,14 +23,6 @@ public interface EpisodeActionService {
     EpisodeActionVo coin(String episodeUid);
 
     /**
-     * 收藏/取消收藏剧集（toggle逻辑）
-     *
-     * @param episodeUid 剧集avid
-     * @return 操作结果（最新收藏数和当前用户收藏状态）
-     */
-    EpisodeActionVo toggleFavorite(String episodeUid);
-
-    /**
      * 查询当前用户对指定剧集的点赞和投币状态
      *
      * @param episodeUid 剧集avid
@@ -39,7 +31,7 @@ public interface EpisodeActionService {
     EpisodeActionStatusVo getActionStatus(String episodeUid);
 
     /**
-     * 查询当前用户对指定剧集的收藏状态
+     * 查询当前用户对指定剧集的收藏状态（含已收藏的收藏夹标识列表）
      *
      * @param episodeUid 剧集avid
      * @return 收藏状态

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.FavoriteFolderMapper">
+
+    <resultMap id="FavoriteFolderVoResultMap" type="com.cjym.videoweb.model.vo.FavoriteFolderVo">
+        <result column="folder_uid" property="folderUid" jdbcType="VARCHAR"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="is_default" property="isDefault" jdbcType="SMALLINT"/>
+        <result column="is_private" property="isPrivate" jdbcType="SMALLINT"/>
+        <result column="count" property="count" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 查询用户收藏夹列表（含各夹收藏数），默认夹排最前；publicOnly 为 true 时仅返回公开夹 -->
+    <select id="selectFolderListWithCount" resultMap="FavoriteFolderVoResultMap">
+        SELECT ff.avid       AS folder_uid,
+               ff.name,
+               ff.is_default,
+               ff.is_private,
+               ff.create_time,
+               (SELECT COUNT(*)
+                FROM public.episode_favorite ef
+                WHERE ef.folder_id = ff.id
+                  AND ef.status = 1) AS "count"
+        FROM public.favorite_folder ff
+        WHERE ff.user_id = #{userId}
+          AND ff.is_delete = 0
+        <if test="publicOnly != null and publicOnly">
+          AND ff.is_private = 0
+        </if>
+        ORDER BY ff.is_default DESC, ff.create_time ASC
+    </select>
+
+</mapper>

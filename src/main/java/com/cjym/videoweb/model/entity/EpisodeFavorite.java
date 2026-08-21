@@ -19,6 +19,9 @@ public class EpisodeFavorite {
     @Schema(description = "关联剧集ID")
     private Long episodeId;
 
+    @Schema(description = "所属收藏文件夹ID")
+    private Long folderId;
+
     @Schema(description = "收藏用户ID")
     private Long userId;
 

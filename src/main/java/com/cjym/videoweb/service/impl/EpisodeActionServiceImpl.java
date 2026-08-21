@@ -7,11 +7,13 @@ import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.EpisodeCoinMapper;
 import com.cjym.videoweb.mapper.EpisodeFavoriteMapper;
 import com.cjym.videoweb.mapper.EpisodeLikeMapper;
+import com.cjym.videoweb.mapper.FavoriteFolderMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.model.entity.EpisodeCoin;
 import com.cjym.videoweb.model.entity.EpisodeFavorite;
 import com.cjym.videoweb.model.entity.EpisodeLike;
+import com.cjym.videoweb.model.entity.FavoriteFolder;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.EpisodeActionStatusVo;
@@ -27,6 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 @Service
 public class EpisodeActionServiceImpl implements EpisodeActionService {
 
@@ -41,6 +47,9 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
 
     @Resource
     private EpisodeFavoriteMapper episodeFavoriteMapper;
+
+    @Resource
+    private FavoriteFolderMapper favoriteFolderMapper;
 
     @Resource
     private UserInfoMapper userInfoMapper;
@@ -168,77 +177,6 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public EpisodeActionVo toggleFavorite(String episodeUid) {
-        if (episodeUid == null || episodeUid.isBlank()) {
-            throw new GlobeException("剧集avid不能为空");
-        }
-        Long currentUserId = getCurrentUserId();
-        if (currentUserId == null) {
-            throw new GlobeException("请先登录");
-        }
-        // 按 avid 查询剧集
-        VideoEpisode episode = videoEpisodeMapper.selectOne(
-                new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
-        if (episode == null) {
-            throw new GlobeException("剧集不存在");
-        }
-
-        Long episodeId = episode.getId();
-        // 查询是否已收藏
-        LambdaQueryWrapper<EpisodeFavorite> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(EpisodeFavorite::getEpisodeId, episodeId)
-                .eq(EpisodeFavorite::getUserId, currentUserId);
-        EpisodeFavorite existingFavorite = episodeFavoriteMapper.selectOne(wrapper);
-
-        boolean isFavorited;
-        long favoriteCount;
-
-        if (existingFavorite != null) {
-            // toggle：已收藏 → 取消，已取消 → 收藏
-            if (existingFavorite.getStatus() == CommentConstant.LIKE_ACTIVE) {
-                existingFavorite.setStatus(CommentConstant.LIKE_CANCELLED);
-                episodeFavoriteMapper.updateById(existingFavorite);
-                // 剧集收藏数 -1
-                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
-                        .eq(VideoEpisode::getId, episodeId)
-                        .setSql("favorite_count = favorite_count - 1"));
-                isFavorited = false;
-            } else {
-                existingFavorite.setStatus(CommentConstant.LIKE_ACTIVE);
-                episodeFavoriteMapper.updateById(existingFavorite);
-                // 剧集收藏数 +1
-                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
-                        .eq(VideoEpisode::getId, episodeId)
-                        .setSql("favorite_count = favorite_count + 1"));
-                isFavorited = true;
-            }
-        } else {
-            // 首次收藏
-            EpisodeFavorite favorite = new EpisodeFavorite();
-            favorite.setEpisodeId(episodeId);
-            favorite.setUserId(currentUserId);
-            favorite.setStatus(CommentConstant.LIKE_ACTIVE);
-            episodeFavoriteMapper.insert(favorite);
-            // 剧集收藏数 +1
-            videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
-                    .eq(VideoEpisode::getId, episodeId)
-                    .setSql("favorite_count = favorite_count + 1"));
-            isFavorited = true;
-        }
-
-        // 查询最新收藏数
-        VideoEpisode updatedEpisode = videoEpisodeMapper.selectById(episodeId);
-        favoriteCount = updatedEpisode != null && updatedEpisode.getFavoriteCount() != null
-                ? updatedEpisode.getFavoriteCount() : 0L;
-
-        EpisodeActionVo vo = new EpisodeActionVo();
-        vo.setCount(favoriteCount);
-        vo.setIsActioned(isFavorited);
-        return vo;
-    }
-
-    @Override
     public EpisodeActionStatusVo getActionStatus(String episodeUid) {
         if (episodeUid == null || episodeUid.isBlank()) {
             throw new GlobeException("剧集avid不能为空");
@@ -270,7 +208,33 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
         }
 
         EpisodeFavoriteStatusVo vo = new EpisodeFavoriteStatusVo();
-        vo.setIsFavorited(isFavorited(episode.getId()));
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            vo.setIsFavorited(false);
+            return vo;
+        }
+        // 查询该用户对该剧集的所有 active 收藏记录
+        List<EpisodeFavorite> favorites = episodeFavoriteMapper.selectList(
+                new LambdaQueryWrapper<EpisodeFavorite>()
+                        .eq(EpisodeFavorite::getEpisodeId, episode.getId())
+                        .eq(EpisodeFavorite::getUserId, currentUserId)
+                        .eq(EpisodeFavorite::getStatus, CommentConstant.LIKE_ACTIVE));
+        if (favorites.isEmpty()) {
+            vo.setIsFavorited(false);
+            return vo;
+        }
+        vo.setIsFavorited(true);
+        // 批量查询收藏夹标识列表
+        List<Long> folderIds = favorites.stream()
+                .map(EpisodeFavorite::getFolderId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (!folderIds.isEmpty()) {
+            List<String> folderUids = favoriteFolderMapper.selectBatchIds(folderIds).stream()
+                    .map(FavoriteFolder::getAvid)
+                    .collect(Collectors.toList());
+            vo.setFolderUids(folderUids);
+        }
         return vo;
     }
 

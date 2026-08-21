@@ -27,7 +27,7 @@ public class ClientReportController {
      *
      * @param dto 举报请求体，videoUid 必填，episodeUid 可选
      */
-    @PostMapping
+    @PostMapping("/create")
     @Operation(summary = "举报稿件", description = "举报违规视频或剧集：videoUid为被举报视频avid（必填），episodeUid为被举报剧集avid（可选，不传表示举报整个视频）；同一用户对同一目标仅允许一条待处理举报")
     public R<String> report(@RequestBody ReportCreateDto dto) {
         reportService.createClient(dto);

@@ -63,24 +63,12 @@ public class EpisodeActionController {
     }
 
     /**
-     * 收藏/取消收藏剧集
-     *
-     * @param episodeUid 剧集avid
-     */
-    @PostMapping("/{episodeUid}/favorite")
-    @Operation(summary = "收藏/取消收藏", description = "toggle逻辑：已收藏则取消，未收藏则收藏；返回最新收藏数和当前用户收藏状态")
-    public R<EpisodeActionVo> favorite(
-            @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
-        return R.success(episodeActionService.toggleFavorite(episodeUid));
-    }
-
-    /**
      * 查询当前用户对指定剧集的收藏状态
      *
      * @param episodeUid 剧集avid
      */
     @GetMapping("/{episodeUid}/favorite/status")
-    @Operation(summary = "查询收藏状态", description = "查询当前用户对该剧集是否已收藏；未登录时返回false")
+    @Operation(summary = "查询收藏状态", description = "查询当前用户对该剧集是否已收藏及已收藏的收藏夹标识列表；未登录时返回未收藏")
     public R<EpisodeFavoriteStatusVo> favoriteStatus(
             @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
         return R.success(episodeActionService.getFavoriteStatus(episodeUid));
