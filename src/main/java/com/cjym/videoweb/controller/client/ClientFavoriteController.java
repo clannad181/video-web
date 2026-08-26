@@ -10,6 +10,7 @@ import com.cjym.videoweb.model.dto.FavoriteListDto;
 import com.cjym.videoweb.model.dto.FavoritePublicFolderListDto;
 import com.cjym.videoweb.model.dto.FavoritePublicListDto;
 import com.cjym.videoweb.model.dto.FavoriteRemoveDto;
+import com.cjym.videoweb.model.dto.FavoriteSearchDto;
 import com.cjym.videoweb.model.vo.FavoriteEpisodeVo;
 import com.cjym.videoweb.model.vo.FavoriteFolderDetailVo;
 import com.cjym.videoweb.model.vo.FavoriteFolderVo;
@@ -85,6 +86,17 @@ public class ClientFavoriteController {
     @Operation(summary = "分页查询收藏列表", description = "分页查询指定收藏夹内的收藏剧集列表（含视频与UP主信息），按收藏时间倒序")
     public R<IPage<FavoriteEpisodeVo>> list(@RequestBody FavoriteListDto dto) {
         return R.success(favoriteService.pageList(dto));
+    }
+
+    /**
+     * 分页搜索收藏内容
+     *
+     * @param dto 搜索请求体，folderUid 可选（不传在所有收藏夹中搜索），title 可选（模糊匹配剧集标题或视频标题），page/size 缺省为 1/10
+     */
+    @PostMapping("/search")
+    @Operation(summary = "搜索收藏内容", description = "按剧集/视频标题模糊搜索当前用户收藏（同一剧集多夹收藏时按剧集去重，取最新收藏时间）：folderUid不传时在全部收藏夹搜索，传入时仅在指定收藏夹搜索；title不传时查询全部，按收藏时间倒序")
+    public R<IPage<FavoriteEpisodeVo>> search(@RequestBody FavoriteSearchDto dto) {
+        return R.success(favoriteService.pageSearch(dto));
     }
 
     /**

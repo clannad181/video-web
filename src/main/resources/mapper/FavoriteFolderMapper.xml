@@ -8,6 +8,7 @@
         <result column="is_default" property="isDefault" jdbcType="SMALLINT"/>
         <result column="is_private" property="isPrivate" jdbcType="SMALLINT"/>
         <result column="count" property="count" jdbcType="BIGINT"/>
+        <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
@@ -21,7 +22,15 @@
                (SELECT COUNT(*)
                 FROM public.episode_favorite ef
                 WHERE ef.folder_id = ff.id
-                  AND ef.status = 1) AS "count"
+                  AND ef.status = 1) AS "count",
+               (SELECT vi.cover_url
+                FROM public.episode_favorite ef
+                INNER JOIN public.video_episode ve ON ve.id = ef.episode_id AND ve.is_delete = 0
+                INNER JOIN public.video_info vi ON vi.id = ve.video_id AND vi.is_delete = 0
+                WHERE ef.folder_id = ff.id
+                  AND ef.status = 1
+                ORDER BY ef.create_time DESC
+                LIMIT 1) AS cover_url
         FROM public.favorite_folder ff
         WHERE ff.user_id = #{userId}
           AND ff.is_delete = 0

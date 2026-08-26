@@ -20,10 +20,15 @@ import java.util.List;
 public interface WatchHistoryMapper extends BaseMapper<WatchHistory> {
 
     /**
-     * 分页查询用户的观看历史（关联视频和剧集信息）
+     * 分页查询用户的观看历史（关联视频和剧集信息，每个视频仅保留最新观看的一条）
      */
     IPage<WatchHistoryVo> selectWatchHistoryPage(Page<WatchHistoryVo> page,
                                                   @Param("userId") Long userId);
+
+    /**
+     * 观看历史分页统计（每个视频仅计一次，供分页插件直接调用）
+     */
+    Long selectWatchHistoryPage_COUNT(@Param("userId") Long userId);
 
     /**
      * 按日期范围统计每日播放量

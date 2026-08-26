@@ -8,6 +8,8 @@ import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.CategoryDailyIncrementVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
+import com.cjym.videoweb.model.vo.MyContributionVideoVo;
+import com.cjym.videoweb.model.vo.UserEpisodeStatsVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import org.apache.ibatis.annotations.MapKey;
@@ -15,6 +17,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +67,18 @@ public interface VideoMapper extends BaseMapper<Video> {
      */
     List<ClientVideoVo> selectFavoriteTop(@Param("limit") int limit,
                                           @Param("excludeIds") List<Long> excludeIds);
+
+    /**
+     * 查询用户指定时间范围内的投稿视频（含播放/收藏聚合与最新审核通过剧集avid），按投稿时间倒序
+     */
+    List<MyContributionVideoVo> selectMyContributions(@Param("userId") Long userId,
+                                                       @Param("startTime") LocalDateTime startTime,
+                                                       @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * 查询用户所有剧集的累计获赞数与播放数（聚合 video_info 与 video_episode，均过滤逻辑删除）
+     */
+    UserEpisodeStatsVo selectUserEpisodeStats(@Param("userId") Long userId);
 
     /**
      * 查询视频详情（JOIN user_info 获取UP主最新信息）

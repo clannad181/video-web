@@ -29,7 +29,7 @@ public class WatchHistoryController {
     }
 
     @GetMapping("/list")
-    @Operation(summary = "分页查询观看历史", description = "分页查询当前用户的观看历史列表（含视频和剧集信息），按最近观看时间倒序")
+    @Operation(summary = "分页查询观看历史", description = "分页查询当前用户的观看历史列表（含视频和剧集信息），每个视频仅返回最新观看的一条剧集记录，按最近观看时间倒序")
     public R<IPage<WatchHistoryVo>> list(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {

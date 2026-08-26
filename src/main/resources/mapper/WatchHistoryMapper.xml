@@ -31,28 +31,44 @@
         <result column="watch_time" property="watchTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
-    <!-- ==================== 分页查询用户观看历史（关联视频和剧集） ==================== -->
+    <!-- ==================== 分页查询用户观看历史（关联视频和剧集，每个视频仅保留最新观看的一条） ==================== -->
     <select id="selectWatchHistoryPage" resultMap="WatchHistoryVoResultMap">
-        SELECT
-            wh.id,
-            wh.user_id,
-            wh.video_id,
-            wh.episode_id,
-            wh.watched_seconds,
-            wh.play_link,
-            wh.watch_time,
-            vi.avid       AS video_avid,
-            vi.title      AS video_title,
-            vi.cover_url  AS video_cover,
-            ve.avid       AS episode_avid,
-            ve.title      AS episode_title,
-            ve.episode_number
-        FROM public.watch_history wh
-        LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
-        LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
-        WHERE wh.is_delete = 0
-          AND wh.user_id = #{userId}
-        ORDER BY wh.watch_time DESC
+        SELECT *
+        FROM (
+            SELECT DISTINCT ON (wh.video_id)
+                wh.id,
+                wh.user_id,
+                wh.video_id,
+                wh.episode_id,
+                wh.watched_seconds,
+                wh.play_link,
+                wh.watch_time,
+                vi.avid       AS video_avid,
+                vi.title      AS video_title,
+                vi.cover_url  AS video_cover,
+                ve.avid       AS episode_avid,
+                ve.title      AS episode_title,
+                ve.episode_number
+            FROM public.watch_history wh
+            LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
+            LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
+            WHERE wh.is_delete = 0
+              AND wh.user_id = #{userId}
+            ORDER BY wh.video_id, wh.watch_time DESC
+        ) t
+        ORDER BY t.watch_time DESC
+    </select>
+
+    <!-- 分页统计：每个视频仅计一次（与主查询去重口径一致，供分页插件直接调用） -->
+    <select id="selectWatchHistoryPage_COUNT" resultType="long">
+        SELECT COUNT(*)
+        FROM (
+            SELECT DISTINCT ON (wh.video_id) wh.video_id
+            FROM public.watch_history wh
+            WHERE wh.is_delete = 0
+              AND wh.user_id = #{userId}
+            ORDER BY wh.video_id, wh.watch_time DESC
+        ) t
     </select>
 
     <!-- ==================== 每日播放量统计 ==================== -->

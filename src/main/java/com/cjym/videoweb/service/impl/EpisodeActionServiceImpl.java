@@ -2,6 +2,7 @@ package com.cjym.videoweb.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.CommentConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.EpisodeCoinMapper;
@@ -19,6 +20,7 @@ import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.EpisodeActionStatusVo;
 import com.cjym.videoweb.model.vo.EpisodeActionVo;
 import com.cjym.videoweb.model.vo.EpisodeFavoriteStatusVo;
+import com.cjym.videoweb.model.vo.RecentActionEpisodeVo;
 import com.cjym.videoweb.service.EpisodeActionService;
 import com.cjym.videoweb.utils.JWTUtil;
 import io.micrometer.common.util.StringUtils;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -93,6 +96,8 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
                 isLiked = false;
             } else {
                 existingLike.setStatus(CommentConstant.LIKE_ACTIVE);
+                // 重新点赞时刷新操作时间，保证“最近点赞”按最新点赞时间排序
+                existingLike.setCreateTime(LocalDateTime.now());
                 episodeLikeMapper.updateById(existingLike);
                 // 剧集点赞数 +1
                 videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
@@ -236,6 +241,46 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
             vo.setFolderUids(folderUids);
         }
         return vo;
+    }
+
+    @Override
+    public List<RecentActionEpisodeVo> listRecentLikes() {
+        Long currentUserId = requireLogin();
+        List<RecentActionEpisodeVo> result = episodeLikeMapper.selectRecentLikeEpisodes(
+                currentUserId, BaseConstant.RECENT_ACTION_LIMIT);
+        fillPlayLink(result);
+        return result;
+    }
+
+    @Override
+    public List<RecentActionEpisodeVo> listRecentCoins() {
+        Long currentUserId = requireLogin();
+        List<RecentActionEpisodeVo> result = episodeCoinMapper.selectRecentCoinEpisodes(
+                currentUserId, BaseConstant.RECENT_ACTION_LIMIT);
+        fillPlayLink(result);
+        return result;
+    }
+
+    /**
+     * 为最近互动记录填充播放跳转链接：/client/video/{videoAvid}/episode/{episodeAvid}
+     */
+    private void fillPlayLink(List<RecentActionEpisodeVo> vos) {
+        vos.forEach(vo -> {
+            if (vo.getVideoAvid() != null && vo.getEpisodeAvid() != null) {
+                vo.setPlayLink("/client/video/" + vo.getVideoAvid() + "/episode/" + vo.getEpisodeAvid());
+            }
+        });
+    }
+
+    /**
+     * 获取当前登录用户ID，未登录抛异常
+     */
+    private Long requireLogin() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        return currentUserId;
     }
 
     @Override

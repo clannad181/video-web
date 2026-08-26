@@ -16,6 +16,7 @@ import com.cjym.videoweb.model.dto.FavoriteFolderDetailDto;
 import com.cjym.videoweb.model.dto.FavoriteListDto;
 import com.cjym.videoweb.model.dto.FavoritePublicListDto;
 import com.cjym.videoweb.model.dto.FavoriteRemoveDto;
+import com.cjym.videoweb.model.dto.FavoriteSearchDto;
 import com.cjym.videoweb.model.entity.EpisodeFavorite;
 import com.cjym.videoweb.model.entity.FavoriteFolder;
 import com.cjym.videoweb.model.entity.UserInfo;
@@ -178,6 +179,20 @@ public class FavoriteServiceImpl implements FavoriteService {
             return voPage;
         }
         return buildPage(folder.getId(), page, size);
+    }
+
+    @Override
+    public IPage<FavoriteEpisodeVo> pageSearch(FavoriteSearchDto dto) {
+        Long currentUserId = requireLogin();
+        int page = dto.getPage() != null ? dto.getPage() : 1;
+        int size = dto.getSize() != null ? dto.getSize() : 10;
+        String keyword = StringUtils.isEmpty(dto.getTitle()) ? null : dto.getTitle().trim();
+        // folderUid 不传时搜索全部收藏夹；传入时仅搜索指定收藏夹（夹不存在报错）
+        Long folderId = null;
+        if (!StringUtils.isEmpty(dto.getFolderUid())) {
+            folderId = favoriteFolderService.findTarget(currentUserId, dto.getFolderUid()).getId();
+        }
+        return episodeFavoriteMapper.selectFavoriteSearchPage(new Page<>(page, size), currentUserId, folderId, keyword);
     }
 
     @Override

@@ -9,6 +9,7 @@ import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
+import com.cjym.videoweb.model.vo.MonthlyContributionVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -113,4 +114,9 @@ public interface VideoService extends IService<Video> {
      * 视频每日增量：按日期范围统计每天新增视频数（无数据的日期补0）
      */
     List<DailyIncrementVo> getDailyIncrement(LocalDate startDate, LocalDate endDate);
+
+    /**
+     * 我的投稿：查询当前登录用户指定时间范围内的投稿视频，按月份分组（月份倒序，组内按投稿时间倒序）
+     */
+    List<MonthlyContributionVo> listMyContributions(LocalDate startDate, LocalDate endDate);
 }

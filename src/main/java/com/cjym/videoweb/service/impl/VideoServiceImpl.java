@@ -26,6 +26,8 @@ import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
+import com.cjym.videoweb.model.vo.MonthlyContributionVo;
+import com.cjym.videoweb.model.vo.MyContributionVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -57,11 +59,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements VideoService {
@@ -134,6 +138,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         IPage<ClientVideoVo> result = baseMapper.selectClientVideoPage(pageParam, orderColumn);
         // 填充当前用户是否已关注UP主的标记
         fillFollowStatus(result.getRecords());
+        // 填充播放跳转链接
+        fillPlayLink(result.getRecords());
         return result;
     }
 
@@ -564,6 +570,47 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
             result.add(vo);
         }
         return result;
+    }
+
+    @Override
+    public List<MonthlyContributionVo> listMyContributions(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new GlobeException("开始时间和结束时间不能为空");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new GlobeException("开始时间不能晚于结束时间");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        // 查询时间范围内的投稿（结束日期含当天，SQL 使用左闭右开区间），已按投稿时间倒序
+        List<MyContributionVideoVo> videos = baseMapper.selectMyContributions(
+                currentUserId, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay());
+        // 填充播放跳转链接（无审核通过剧集时不填充）
+        videos.forEach(vo -> {
+            if (vo.getAvid() != null && vo.getEpisodeAvid() != null) {
+                vo.setPlayLink("/client/video/" + vo.getAvid() + "/episode/" + vo.getEpisodeAvid());
+            }
+        });
+        // 按月份分组（LinkedHashMap 保持组内投稿时间倒序）
+        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        Map<String, List<MyContributionVideoVo>> grouped = videos.stream()
+                .collect(Collectors.groupingBy(
+                        vo -> vo.getCreateTime().format(monthFormatter),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+        // 月份倒序组装
+        return grouped.entrySet().stream()
+                .sorted(Map.Entry.<String, List<MyContributionVideoVo>>comparingByKey().reversed())
+                .map(entry -> {
+                    MonthlyContributionVo group = new MonthlyContributionVo();
+                    group.setMonth(entry.getKey());
+                    group.setCount(entry.getValue().size());
+                    group.setVideos(entry.getValue());
+                    return group;
+                })
+                .collect(Collectors.toList());
     }
 
     // ==================== 私有方法 ====================

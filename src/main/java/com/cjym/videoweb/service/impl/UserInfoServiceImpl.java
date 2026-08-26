@@ -22,8 +22,10 @@ import com.cjym.videoweb.model.entity.Role;
 import com.cjym.videoweb.model.entity.RoleMenuBind;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.mapper.UserInfoMapper;
+import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
+import com.cjym.videoweb.model.vo.UserEpisodeStatsVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.PasswordVo;
@@ -83,6 +85,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     @Resource
     private FollowMapper followMapper;
+
+    @Resource
+    private VideoMapper videoMapper;
 
     @Resource
     private WebConfigService webConfigService;
@@ -267,6 +272,10 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                 .eq(Follow::getFollowUserId, userInfo.getId()));
         vo.setFollowCount(followCount);
         vo.setFansCount(fansCount);
+        // 统计所有剧集的累计获赞数与播放数（无投稿时为0）
+        UserEpisodeStatsVo stats = videoMapper.selectUserEpisodeStats(userInfo.getId());
+        vo.setTotalLikeCount(stats == null ? 0L : stats.getTotalLikeCount());
+        vo.setTotalPlayCount(stats == null ? 0L : stats.getTotalPlayCount());
         return R.success(vo);
     }
 

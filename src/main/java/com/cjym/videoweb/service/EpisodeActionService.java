@@ -3,6 +3,9 @@ package com.cjym.videoweb.service;
 import com.cjym.videoweb.model.vo.EpisodeActionStatusVo;
 import com.cjym.videoweb.model.vo.EpisodeActionVo;
 import com.cjym.videoweb.model.vo.EpisodeFavoriteStatusVo;
+import com.cjym.videoweb.model.vo.RecentActionEpisodeVo;
+
+import java.util.List;
 
 public interface EpisodeActionService {
 
@@ -37,6 +40,20 @@ public interface EpisodeActionService {
      * @return 收藏状态
      */
     EpisodeFavoriteStatusVo getFavoriteStatus(String episodeUid);
+
+    /**
+     * 查询当前用户最近点赞的20条视频（每视频仅返回最近点赞的一集，按点赞时间倒序）
+     *
+     * @return 最近点赞记录列表
+     */
+    List<RecentActionEpisodeVo> listRecentLikes();
+
+    /**
+     * 查询当前用户最近投币的20条视频（每视频仅返回最近投币的一集，按投币时间倒序）
+     *
+     * @return 最近投币记录列表
+     */
+    List<RecentActionEpisodeVo> listRecentCoins();
 
     /**
      * 查询当前用户对指定剧集的点赞状态

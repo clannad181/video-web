@@ -48,4 +48,10 @@ public class ClientUserVo {
 
     @Schema(description = "粉丝数")
     private Long fansCount;
+
+    @Schema(description = "累计获赞数（所有剧集点赞数之和）")
+    private Long totalLikeCount;
+
+    @Schema(description = "累计播放数（所有剧集播放数之和）")
+    private Long totalPlayCount;
 }

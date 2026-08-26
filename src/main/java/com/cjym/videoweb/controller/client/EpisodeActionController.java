@@ -3,6 +3,7 @@ package com.cjym.videoweb.controller.client;
 import com.cjym.videoweb.model.vo.EpisodeActionStatusVo;
 import com.cjym.videoweb.model.vo.EpisodeActionVo;
 import com.cjym.videoweb.model.vo.EpisodeFavoriteStatusVo;
+import com.cjym.videoweb.model.vo.RecentActionEpisodeVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EpisodeActionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 前台剧集互动（点赞/投币）
@@ -72,5 +75,23 @@ public class EpisodeActionController {
     public R<EpisodeFavoriteStatusVo> favoriteStatus(
             @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
         return R.success(episodeActionService.getFavoriteStatus(episodeUid));
+    }
+
+    /**
+     * 查询当前用户最近点赞的20条视频
+     */
+    @GetMapping("/like/recent")
+    @Operation(summary = "最近点赞的视频", description = "查询当前用户最近点赞的20条视频（每个视频仅返回最近点赞的一集），按点赞时间倒序")
+    public R<List<RecentActionEpisodeVo>> recentLikes() {
+        return R.success(episodeActionService.listRecentLikes());
+    }
+
+    /**
+     * 查询当前用户最近投币的20条视频
+     */
+    @GetMapping("/coin/recent")
+    @Operation(summary = "最近投币的视频", description = "查询当前用户最近投币的20条视频（每个视频仅返回最近投币的一集），按投币时间倒序")
+    public R<List<RecentActionEpisodeVo>> recentCoins() {
+        return R.success(episodeActionService.listRecentCoins());
     }
 }

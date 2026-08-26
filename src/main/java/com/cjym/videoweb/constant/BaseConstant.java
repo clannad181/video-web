@@ -63,6 +63,11 @@ public class BaseConstant {
      */
     public static final Integer RELATED_VIDEO_CANDIDATE_LIMIT = 500;
 
+    /**
+     * 最近点赞/投币视频数量上限
+     */
+    public static final Integer RECENT_ACTION_LIMIT = 20;
+
     // ==================== Token 有效期配置 key（存放在 web_config 表） ====================
     /** 前台 Access Token 有效期配置键 */
     public static final String FRONT_ACCESS_TOKEN_EXPIRY = "front_access_token_expiry";

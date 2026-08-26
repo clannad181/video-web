@@ -25,6 +25,9 @@ public class FavoriteFolderVo {
     @Schema(description = "收藏数量")
     private Long count;
 
+    @Schema(description = "封面URL（夹内最新收藏视频的封面）")
+    private String coverUrl;
+
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
