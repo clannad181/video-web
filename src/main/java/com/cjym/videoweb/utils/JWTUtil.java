@@ -78,6 +78,10 @@ public class JWTUtil {
         return parseClaims(token).getSubject();
     }
 
+    public static Long getUserId(String token) {
+        return parseClaims(token).get("userId", Long.class);
+    }
+
     public static boolean validateToken(String token) {
         try {
             parseClaims(token);

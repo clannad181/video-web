@@ -454,9 +454,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

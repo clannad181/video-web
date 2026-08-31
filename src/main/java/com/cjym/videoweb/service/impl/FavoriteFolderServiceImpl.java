@@ -124,8 +124,10 @@ public class FavoriteFolderServiceImpl implements FavoriteFolderService {
         folder.setUserId(currentUserId);
         folder.setName(name);
         folder.setIsDefault(0);
+        folder.setCoverUrl(dto.getCoverUrl());
         folder.setIsPrivate(Boolean.TRUE.equals(dto.getIsPrivate())
                 ? FavoriteConstant.FOLDER_PRIVATE : FavoriteConstant.FOLDER_PUBLIC);
+        folder.setDescription(checkDescription(dto.getDescription()));
         favoriteFolderMapper.insert(folder);
     }
 
@@ -134,8 +136,9 @@ public class FavoriteFolderServiceImpl implements FavoriteFolderService {
     public void update(FavoriteFolderUpdateDto dto) {
         Long currentUserId = requireLogin();
         FavoriteFolder folder = requireFolder(currentUserId, dto.getFolderUid());
-        // name 与 isPrivate 至少传一个
-        if (StringUtils.isEmpty(dto.getName()) && dto.getIsPrivate() == null) {
+        // name、isPrivate、coverUrl、description 至少传一个
+        if (StringUtils.isEmpty(dto.getName()) && dto.getIsPrivate() == null && dto.getCoverUrl() == null
+                && dto.getDescription() == null) {
             throw new GlobeException("没有需要修改的内容");
         }
         // 名称非空时校验并更新（默认夹可改名）
@@ -148,6 +151,14 @@ public class FavoriteFolderServiceImpl implements FavoriteFolderService {
         if (dto.getIsPrivate() != null) {
             folder.setIsPrivate(dto.getIsPrivate()
                     ? FavoriteConstant.FOLDER_PRIVATE : FavoriteConstant.FOLDER_PUBLIC);
+        }
+        // 封面非null时更新（传空字符串清除自定义封面，恢复为最新收藏视频封面）
+        if (dto.getCoverUrl() != null) {
+            folder.setCoverUrl(checkCover(dto.getCoverUrl()));
+        }
+        // 描述非null时更新（传空字符串清除描述）
+        if (dto.getDescription() != null) {
+            folder.setDescription(checkDescription(dto.getDescription()));
         }
         favoriteFolderMapper.updateById(folder);
     }
@@ -214,6 +225,31 @@ public class FavoriteFolderServiceImpl implements FavoriteFolderService {
     }
 
     /**
+     * 校验收藏夹封面：空字符串表示清除自定义封面，非空去除首尾空格后不超过最大长度
+     */
+    private String checkCover(String coverUrl) {
+        String trimmed = coverUrl.trim();
+        if (trimmed.length() > FavoriteConstant.FOLDER_COVER_MAX_LENGTH) {
+            throw new GlobeException("收藏夹封面最长" + FavoriteConstant.FOLDER_COVER_MAX_LENGTH + "字");
+        }
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /**
+     * 校验收藏夹描述：空或空字符串视为未设置，非空去除首尾空格后不超过最大长度
+     */
+    private String checkDescription(String description) {
+        if (StringUtils.isEmpty(description)) {
+            return null;
+        }
+        String trimmed = description.trim();
+        if (trimmed.length() > FavoriteConstant.FOLDER_DESC_MAX_LENGTH) {
+            throw new GlobeException("收藏夹描述最长" + FavoriteConstant.FOLDER_DESC_MAX_LENGTH + "字");
+        }
+        return trimmed;
+    }
+
+    /**
      * 校验同用户收藏夹名称唯一（排除指定文件夹）
      */
     private void checkNameUnique(Long userId, String name, Long excludeId) {
@@ -256,9 +292,7 @@ public class FavoriteFolderServiceImpl implements FavoriteFolderService {
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

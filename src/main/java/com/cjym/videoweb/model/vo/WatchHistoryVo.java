@@ -1,6 +1,7 @@
 package com.cjym.videoweb.model.vo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -10,13 +11,16 @@ import java.time.LocalDateTime;
 @Schema(description = "观看历史记录视图")
 public class WatchHistoryVo {
 
-    @Schema(description = "记录id")
+    @JsonIgnore
+    @Schema(hidden = true)
     private Long id;
 
-    @Schema(description = "用户ID")
+    @JsonIgnore
+    @Schema(hidden = true)
     private Long userId;
 
-    @Schema(description = "视频ID")
+    @JsonIgnore
+    @Schema(hidden = true)
     private Long videoId;
 
     @Schema(description = "视频avid")
@@ -28,7 +32,14 @@ public class WatchHistoryVo {
     @Schema(description = "视频封面URL")
     private String videoCover;
 
-    @Schema(description = "剧集ID")
+    @Schema(description = "UP主昵称")
+    private String nickName;
+
+    @Schema(description = "UP主头像URL")
+    private String avatarUrl;
+
+    @JsonIgnore
+    @Schema(hidden = true)
     private Long episodeId;
 
     @Schema(description = "剧集avid")

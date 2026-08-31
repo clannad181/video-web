@@ -1,7 +1,10 @@
 package com.cjym.videoweb.model.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * 前台用户基础信息（客户端）
@@ -43,6 +46,10 @@ public class ClientUserVo {
     @Schema(description = "性别")
     private Boolean sex;
 
+    @Schema(description = "生日")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd")
+    private LocalDate birthday;
+
     @Schema(description = "关注数")
     private Long followCount;
 
@@ -54,4 +61,8 @@ public class ClientUserVo {
 
     @Schema(description = "累计播放数（所有剧集播放数之和）")
     private Long totalPlayCount;
+
+    @Schema(description = "创建时间")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createTime;
 }

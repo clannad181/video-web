@@ -157,8 +157,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        String username = JWTUtil.getUsername(token);
-        UserInfo userInfo = userInfoMapper.selectByUserName(username);
+        Long userId = JWTUtil.getUserId(token);
+        UserInfo userInfo = userInfoMapper.selectById(userId);
         if (userInfo == null || userInfo.getRoleId() == null) {
             return null;
         }

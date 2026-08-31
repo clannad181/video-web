@@ -2,6 +2,7 @@ package com.cjym.videoweb.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.cjym.videoweb.model.dto.VideoContributeDto;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
@@ -29,9 +30,9 @@ public interface VideoService extends IService<Video> {
                                    Integer field, String descOrAsc,Boolean isOngoing,String avid);
 
     /**
-     * 分页查询前台展示视频（仅已发布且至少有一集审核通过），支持最新/最火热排序
+     * 分页查询前台展示视频（仅已发布且至少有一集审核通过），支持最新/最火热排序与分类筛选
      */
-    IPage<ClientVideoVo> pageClientVideo(Integer page, Integer size, String sortType);
+    IPage<ClientVideoVo> pageClientVideo(Integer page, Integer size, String sortType, Long categoryId);
 
     /**
      * 前台视频推荐：已登录返回关注的UP主最新视频（不足时用最多收藏补齐），未登录返回最多收藏视频，最多6条
@@ -119,4 +120,24 @@ public interface VideoService extends IService<Video> {
      * 我的投稿：查询当前登录用户指定时间范围内的投稿视频，按月份分组（月份倒序，组内按投稿时间倒序）
      */
     List<MonthlyContributionVo> listMyContributions(LocalDate startDate, LocalDate endDate);
+
+    /**
+     * 用户端投稿视频（身份从token解析，审核流程跟随免审配置：免审关闭时自动发布，开启时进入待发布待审核）
+     */
+    Video contribute(VideoContributeDto dto);
+
+    /**
+     * 用户端编辑投稿（按avid定位自己的视频，仅未发布前可编辑，审核流程跟随免审配置）
+     */
+    void updateContribution(VideoContributeDto dto);
+
+    /**
+     * 用户端删除投稿（按avid定位自己的视频，级联删除剧集）
+     */
+    void deleteContribution(String videoUid);
+
+    /**
+     * 用户端投稿详情（按avid查询自己的视频，含剧集和标签，供编辑回显）
+     */
+    VideoVo getContributionDetail(String videoUid);
 }

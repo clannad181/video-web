@@ -14,6 +14,7 @@ import com.cjym.videoweb.model.dto.FavoriteSearchDto;
 import com.cjym.videoweb.model.vo.FavoriteEpisodeVo;
 import com.cjym.videoweb.model.vo.FavoriteFolderDetailVo;
 import com.cjym.videoweb.model.vo.FavoriteFolderVo;
+import com.cjym.videoweb.model.vo.FavoriteSearchVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.FavoriteFolderService;
 import com.cjym.videoweb.service.FavoriteService;
@@ -72,7 +73,7 @@ public class ClientFavoriteController {
      * @param dto 查询请求体，folderUid 必填，page/size 缺省为 1/10
      */
     @PostMapping("/detail")
-    @Operation(summary = "查看收藏夹详情", description = "按收藏夹标识分页查看收藏内容并返回收藏夹基本信息：本人可查看自己的私密夹；他人私密夹统一返回「收藏夹不存在」；游客可访问公开夹")
+    @Operation(summary = "查看收藏夹详情", description = "按收藏夹标识分页查看收藏内容并返回收藏夹基本信息（含封面，自定义封面优先，未设置时为最新收藏视频封面）：本人可查看自己的私密夹；他人私密夹统一返回「收藏夹不存在」；游客可访问公开夹")
     public R<FavoriteFolderDetailVo> detail(@RequestBody FavoriteFolderDetailDto dto) {
         return R.success(favoriteService.pageDetail(dto));
     }
@@ -91,11 +92,11 @@ public class ClientFavoriteController {
     /**
      * 分页搜索收藏内容
      *
-     * @param dto 搜索请求体，folderUid 可选（不传在所有收藏夹中搜索），title 可选（模糊匹配剧集标题或视频标题），page/size 缺省为 1/10
+     * @param dto 搜索请求体，folderUid 可选（不传在所有收藏夹中搜索），title 可选（模糊匹配剧集标题/视频标题/UP主昵称/UP主uid），page/size 缺省为 1/10
      */
     @PostMapping("/search")
-    @Operation(summary = "搜索收藏内容", description = "按剧集/视频标题模糊搜索当前用户收藏（同一剧集多夹收藏时按剧集去重，取最新收藏时间）：folderUid不传时在全部收藏夹搜索，传入时仅在指定收藏夹搜索；title不传时查询全部，按收藏时间倒序")
-    public R<IPage<FavoriteEpisodeVo>> search(@RequestBody FavoriteSearchDto dto) {
+    @Operation(summary = "搜索收藏内容", description = "按剧集标题/视频标题/UP主昵称/UP主uid模糊搜索当前用户收藏（同一剧集多夹收藏时按剧集去重，取最新收藏时间）：folderUid不传时在全部收藏夹搜索，传入时仅在指定收藏夹搜索；title不传时查询全部，按收藏时间倒序；结果含UP主完整公开信息（uid/昵称/头像/签名/性别/大会员/关注数/粉丝数/累计获赞/累计播放）")
+    public R<IPage<FavoriteSearchVo>> search(@RequestBody FavoriteSearchDto dto) {
         return R.success(favoriteService.pageSearch(dto));
     }
 
@@ -136,19 +137,19 @@ public class ClientFavoriteController {
      * @param dto 创建请求体，name 必填（最长20字，同用户下不可重名）
      */
     @PostMapping("/folder/create")
-    @Operation(summary = "创建收藏夹", description = "创建自定义收藏夹：名称最长20字且同用户下不可重名，每用户最多50个；isPrivate不传默认公开")
+    @Operation(summary = "创建收藏夹", description = "创建自定义收藏夹：名称最长20字且同用户下不可重名，每用户最多50个；isPrivate不传默认公开；description可选（最长200字）")
     public R<String> createFolder(@RequestBody FavoriteFolderCreateDto dto) {
         favoriteFolderService.create(dto);
         return R.success("创建成功");
     }
 
     /**
-     * 重命名收藏夹
+     * 修改收藏夹（重命名/设置私密/设置封面/设置描述）
      *
-     * @param dto 更新请求体，folderUid、name 必填
+     * @param dto 更新请求体，folderUid 必填，name/isPrivate/coverUrl/description 至少传一个
      */
     @PostMapping("/folder/update")
-    @Operation(summary = "重命名/设置私密收藏夹", description = "修改收藏夹名称或可见性（至少传一个）：名称最长20字且同用户下不可重名；默认收藏夹同样支持设置私密")
+    @Operation(summary = "修改收藏夹（重命名/设置私密/设置封面/设置描述）", description = "修改收藏夹名称、可见性、封面或描述（至少传一个）：名称最长20字且同用户下不可重名；默认收藏夹同样支持设置私密；coverUrl传空字符串清除自定义封面（恢复为最新收藏视频封面）；description传空字符串清除描述（最长200字）")
     public R<String> updateFolder(@RequestBody FavoriteFolderUpdateDto dto) {
         favoriteFolderService.update(dto);
         return R.success("修改成功");

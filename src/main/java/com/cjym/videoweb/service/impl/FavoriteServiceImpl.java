@@ -24,6 +24,7 @@ import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.FavoriteEpisodeVo;
 import com.cjym.videoweb.model.vo.FavoriteFolderDetailVo;
+import com.cjym.videoweb.model.vo.FavoriteSearchVo;
 import com.cjym.videoweb.service.FavoriteFolderService;
 import com.cjym.videoweb.service.FavoriteService;
 import com.cjym.videoweb.utils.JWTUtil;
@@ -182,7 +183,7 @@ public class FavoriteServiceImpl implements FavoriteService {
     }
 
     @Override
-    public IPage<FavoriteEpisodeVo> pageSearch(FavoriteSearchDto dto) {
+    public IPage<FavoriteSearchVo> pageSearch(FavoriteSearchDto dto) {
         Long currentUserId = requireLogin();
         int page = dto.getPage() != null ? dto.getPage() : 1;
         int size = dto.getSize() != null ? dto.getSize() : 10;
@@ -248,8 +249,29 @@ public class FavoriteServiceImpl implements FavoriteService {
             vo.setNickName(owner.getNikeName());
             vo.setAvatarUrl(owner.getAvatar());
         }
-        vo.setList(buildPage(folder.getId(), page, size));
+        IPage<FavoriteEpisodeVo> favPage = buildPage(folder.getId(), page, size);
+        vo.setList(favPage);
+        // 封面：自定义封面优先，未设置时取夹内最新收藏视频封面
+        vo.setCoverUrl(StringUtils.isEmpty(folder.getCoverUrl())
+                ? latestFavoriteCover(favPage.getRecords())
+                : folder.getCoverUrl());
+        vo.setDescription(folder.getDescription());
         return vo;
+    }
+
+    /**
+     * 取收藏列表中最新收藏视频的封面（记录已按收藏时间倒序）
+     */
+    private String latestFavoriteCover(List<FavoriteEpisodeVo> records) {
+        if (records == null) {
+            return null;
+        }
+        for (FavoriteEpisodeVo record : records) {
+            if (!StringUtils.isEmpty(record.getVideoCover())) {
+                return record.getVideoCover();
+            }
+        }
+        return null;
     }
 
     /**
@@ -354,9 +376,7 @@ public class FavoriteServiceImpl implements FavoriteService {
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

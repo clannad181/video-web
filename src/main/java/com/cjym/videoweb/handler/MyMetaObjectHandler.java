@@ -1,14 +1,11 @@
 package com.cjym.videoweb.handler;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
-import com.cjym.videoweb.mapper.UserInfoMapper;
-import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.utils.JWTUtil;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.ibatis.reflection.MetaObject;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -17,10 +14,6 @@ import java.time.LocalDateTime;
 
 @Component
 public class MyMetaObjectHandler implements MetaObjectHandler {
-
-    @Lazy
-    @Resource
-    private UserInfoMapper userInfoMapper;
 
     @Override
     public void insertFill(MetaObject metaObject) {
@@ -66,9 +59,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

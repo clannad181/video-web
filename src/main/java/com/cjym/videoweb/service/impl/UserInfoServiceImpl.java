@@ -13,6 +13,7 @@ import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.MenuMapper;
 import com.cjym.videoweb.mapper.RoleMapper;
 import com.cjym.videoweb.mapper.RoleMenuBindMapper;
+import com.cjym.videoweb.model.dto.ClientUserUpdateDto;
 import com.cjym.videoweb.model.dto.MenuDto;
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.dto.UserPageDto;
@@ -198,8 +199,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        String username = JWTUtil.getUsername(token);
-        UserInfo userInfo = baseMapper.selectByUserName(username);
+        Long userId = JWTUtil.getUserId(token);
+        UserInfo userInfo = baseMapper.selectById(userId);
         UserVo userVo = new UserVo();
         BeanUtils.copyProperties(userInfo,userVo);
         Long roleId = userInfo.getRoleId();
@@ -258,8 +259,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        String username = JWTUtil.getUsername(token);
-        UserInfo userInfo = baseMapper.selectByUserName(username);
+        Long userId = JWTUtil.getUserId(token);
+        UserInfo userInfo = baseMapper.selectById(userId);
         if (userInfo == null) {
             throw new GlobeException("用户不存在");
         }
@@ -280,26 +281,50 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     }
 
     @Override
+    public R<String> updateClientUserInfo(HttpServletRequest request, ClientUserUpdateDto dto) {
+        String token = request.getHeader("authorization");
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        Long userId = JWTUtil.getUserId(token);
+        UserInfo userInfo = baseMapper.selectById(userId);
+        if (userInfo == null) {
+            return R.error("用户不存在");
+        }
+        if (dto.getNikeName() == null && dto.getAvatar() == null && dto.getSex() == null
+                && dto.getBirthday() == null && dto.getDescript() == null) {
+            return R.error("至少需要修改一个字段");
+        }
+        userInfo.setNikeName(dto.getNikeName());
+        userInfo.setAvatar(dto.getAvatar());
+        userInfo.setSex(dto.getSex());
+        userInfo.setBirthday(dto.getBirthday());
+        userInfo.setDescript(dto.getDescript());
+        baseMapper.updateById(userInfo);
+        return R.success("修改成功");
+    }
+
+    @Override
     public R<Map<String, Object>> refresh(HttpServletRequest request) {
         String requestRefreshToken = request.getHeader("refresh-token");
         // 1. 验证 Refresh Token 是否有效
         if (!verifyRefreshToken(requestRefreshToken)) {
             return R.error(ResultEnum.FORBIDDEN_ERROR);
         }
-        // 2. 从 JWT 中获取用户名和 serverType
-        String username = JWTUtil.getUsername(requestRefreshToken);
+        // 2. 从 JWT 中获取用户ID和 serverType
+        Long userId = JWTUtil.getUserId(requestRefreshToken);
         String serverType = JWTUtil.getServerType(requestRefreshToken);
         // 3. 撤销旧 Refresh Token（Rotation：防止旧 token 继续使用）
         deleteByToken(requestRefreshToken);
         // 4. 生成新的 Access Token 和 Refresh Token
         boolean isFront = BaseConstant.SYS_FRONT.equals(serverType);
-        UserDto userDetails = isFront ? baseMapper.selectFrontDtoByUsername(username)
-                : baseMapper.selectDtoByUsername(username);
+        UserDto userDetails = isFront ? baseMapper.selectFrontDtoById(userId)
+                : baseMapper.selectDtoById(userId);
         String newAccessToken = JWTUtil.createAccessToken(userDetails.getId(), serverType,
-                username, userDetails.getAuthorities(),
+                userDetails.getUsername(), userDetails.getAuthorities(),
                 tokenExpiryConfigService.getAccessTokenExpiry(serverType));
         String newRefreshToken = JWTUtil.createRefreshToken(userDetails.getId(), serverType,
-                username,
+                userDetails.getUsername(),
                 tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
         // 5. 返回新的 Token 对
         return R.success(Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken));
@@ -415,6 +440,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
         if (userUpdateVo.getSex() != null) {
             wrapper.set(UserInfo::getSex, userUpdateVo.getSex());
+        }
+        if (userUpdateVo.getBirthday() != null) {
+            wrapper.set(UserInfo::getBirthday, userUpdateVo.getBirthday());
         }
         if (userUpdateVo.getDescript() != null) {
             wrapper.set(UserInfo::getDescript, userUpdateVo.getDescript());

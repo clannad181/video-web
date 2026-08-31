@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.user_info (
     status      SMALLINT        DEFAULT 0,
     descript    VARCHAR(512),
     sex         BOOLEAN         DEFAULT TRUE,
+    birthday    DATE,
     create_time TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
     create_user BIGINT,
     update_user BIGINT,
@@ -41,6 +42,7 @@ COMMENT ON COLUMN public.user_info.role_id     IS '用户角色Id';
 COMMENT ON COLUMN public.user_info.status      IS '用户状态（0-正常，1-禁用）';
 COMMENT ON COLUMN public.user_info.descript    IS '用户个性签名';
 COMMENT ON COLUMN public.user_info.sex         IS '性别';
+COMMENT ON COLUMN public.user_info.birthday    IS '生日';
 COMMENT ON COLUMN public.user_info.create_time IS '创建时间';
 COMMENT ON COLUMN public.user_info.create_user IS '创建人';
 COMMENT ON COLUMN public.user_info.update_user IS '更新人';

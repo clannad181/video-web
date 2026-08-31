@@ -1,5 +1,6 @@
 package com.cjym.videoweb.controller.client;
 
+import com.cjym.videoweb.model.dto.ClientUserUpdateDto;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
@@ -43,6 +44,12 @@ public class ClientUserController {
     @Operation(summary = "获取前台用户基础信息", description = "获取当前登录前台用户的基础信息（不含角色和菜单）")
     public R<ClientUserVo> getUserInfo(HttpServletRequest request) {
         return userInfoService.getClientUserInfo(request);
+    }
+
+    @PostMapping("/update")
+    @Operation(summary = "更新前台用户个人信息", description = "更新当前登录前台用户的个人信息（昵称、头像、性别、生日、个性签名），至少传一个字段，仅更新传入的非空字段")
+    public R<String> updateUserInfo(@RequestBody ClientUserUpdateDto dto, HttpServletRequest request) {
+        return userInfoService.updateClientUserInfo(request, dto);
     }
 
     @GetMapping("/refresh")

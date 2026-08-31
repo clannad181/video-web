@@ -9,6 +9,7 @@
         <result column="is_show" property="isShow" jdbcType="BOOLEAN"/>
         <result column="is_system" property="isSystem" jdbcType="BOOLEAN"/>
         <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="svg" property="svg" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
         <result column="update_user" property="updateUser" jdbcType="BIGINT"/>
@@ -22,12 +23,13 @@
         <result column="is_show" property="isShow" jdbcType="BOOLEAN"/>
         <result column="is_system" property="isSystem" jdbcType="BOOLEAN"/>
         <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="svg" property="svg" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
     <select id="selectCategoryPage" resultMap="CategoryPageDtoResultMap">
-        SELECT id, name, sort, is_show, is_system, status, create_time, update_time
+        SELECT id, name, sort, is_show, is_system, status, svg, create_time, update_time
         FROM public.category
         <where>
             is_delete = 0

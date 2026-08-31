@@ -20,6 +20,12 @@ public class FavoriteFolderDetailVo {
     @Schema(description = "是否私密（仅本人可见）")
     private Boolean isPrivate;
 
+    @Schema(description = "封面URL（自定义封面优先，未设置时为夹内最新收藏视频封面）")
+    private String coverUrl;
+
+    @Schema(description = "收藏夹描述")
+    private String description;
+
     @Schema(description = "所属用户uid")
     private String userUid;
 

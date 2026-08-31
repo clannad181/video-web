@@ -38,8 +38,6 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
 
     @Override
     public void saveLog(OperationLog operationLog) {
-        // 根据用户名反查 userId
-        fillUserId(operationLog);
         operationLog.setOperationTime(LocalDateTime.now());
         baseMapper.insert(operationLog);
     }
@@ -66,6 +64,13 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
         }
         OperationLogDetailVo vo = new OperationLogDetailVo();
         BeanUtils.copyProperties(operationLog, vo);
+        // 新日志仅记录 userId，按 userId 反查用户名展示
+        if (operationLog.getUserId() != null) {
+            UserInfo userInfo = userInfoMapper.selectById(operationLog.getUserId());
+            if (userInfo != null) {
+                vo.setUsername(userInfo.getUserName());
+            }
+        }
         return vo;
     }
 
@@ -120,22 +125,5 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
             result.add(vo);
         }
         return result;
-    }
-
-    /**
-     * 根据用户名反查 userId
-     */
-    private void fillUserId(OperationLog operationLog) {
-        if (operationLog.getUsername() == null) {
-            return;
-        }
-        try {
-            UserInfo userInfo = userInfoMapper.selectByUserName(operationLog.getUsername());
-            if (userInfo != null) {
-                operationLog.setUserId(userInfo.getId());
-            }
-        } catch (Exception ignored) {
-            // 查不到用户则 userId 为空
-        }
     }
 }

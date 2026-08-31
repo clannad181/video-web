@@ -1,6 +1,7 @@
 package com.cjym.videoweb.model.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -35,6 +36,14 @@ public class FavoriteFolder {
 
     @Schema(description = "1-私密（仅本人可见），0-公开")
     private Integer isPrivate;
+
+    @Schema(description = "自定义封面URL（null表示未设置，使用最新收藏视频封面）")
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String coverUrl;
+
+    @Schema(description = "收藏夹描述（最长200字，null表示未设置）")
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String description;
 
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")

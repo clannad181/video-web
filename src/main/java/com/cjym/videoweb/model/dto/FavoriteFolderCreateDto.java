@@ -12,4 +12,10 @@ public class FavoriteFolderCreateDto {
 
     @Schema(description = "是否私密（可选，不传默认公开）")
     private Boolean isPrivate;
+
+    @Schema(description = "收藏夹描述（可选，最长200字）")
+    private String description;
+
+    @Schema(description = "收藏夹图片（可选）")
+    private String coverUrl;
 }

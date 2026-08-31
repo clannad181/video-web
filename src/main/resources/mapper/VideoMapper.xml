@@ -124,6 +124,9 @@
         LEFT JOIN public.user_info u ON v.user_id = u.id
         WHERE v.is_delete = 0
           AND v.video_status = 2
+          <if test="categoryId != null">
+          AND v.category_id = #{categoryId}
+          </if>
           AND (SELECT COUNT(*) FROM public.video_episode e
                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
         ORDER BY ${orderColumn} DESC

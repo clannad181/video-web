@@ -226,6 +226,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
             vo.setId(e.getId());
             vo.setName(e.getName());
             vo.setSort(e.getSort());
+            vo.setSvg(e.getSvg());
             return vo;
         }).collect(Collectors.toList());
     }

@@ -218,15 +218,14 @@ public class OperationLogAspect {
                 operationLog.setRequestMethod(request.getMethod());
                 operationLog.setIpAddress(getClientIp(request));
                 operationLog.setSystemType(resolveSystemType(request));
-                String username = resolveUsername(request);
-                operationLog.setUsername(username);
+                operationLog.setUserId(resolveUserId(request));
             }
         } catch (Exception e) {
             log.error("填充请求上下文异常", e);
         }
     }
 
-    private String resolveUsername(HttpServletRequest request) {
+    private Long resolveUserId(HttpServletRequest request) {
         String token = request.getHeader("authorization");
         if (StringUtils.isEmpty(token)) {
             return null;
@@ -236,7 +235,7 @@ public class OperationLogAspect {
         }
         token = token.trim();
         if (JWTUtil.validateToken(token)) {
-            return JWTUtil.getUsername(token);
+            return JWTUtil.getUserId(token);
         }
         return null;
     }

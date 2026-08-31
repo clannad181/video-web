@@ -1,12 +1,17 @@
 package com.cjym.videoweb.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
+import com.cjym.videoweb.model.dto.FollowListDto;
 import com.cjym.videoweb.model.entity.Follow;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.FansListVo;
+import com.cjym.videoweb.model.vo.FollowListVo;
 import com.cjym.videoweb.service.FollowService;
 import com.cjym.videoweb.utils.JWTUtil;
 import io.micrometer.common.util.StringUtils;
@@ -83,6 +88,32 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         return baseMapper.selectCount(wrapper) > 0;
     }
 
+    @Override
+    public IPage<FollowListVo> pageList(FollowListDto dto) {
+        Long currentUserId = requireLogin();
+        int page = dto.getPage() != null ? dto.getPage() : 1;
+        int size = dto.getSize() != null ? dto.getSize() : 10;
+        return baseMapper.selectFollowPage(new Page<>(page, size), currentUserId, null);
+    }
+
+    @Override
+    public IPage<FollowListVo> pageSearch(String keyword, Integer page, Integer size) {
+        Long currentUserId = requireLogin();
+        int pageNo = page != null ? page : 1;
+        int pageSize = size != null ? size : 10;
+        String trimmed = StringUtils.isEmpty(keyword) ? null : keyword.trim();
+        return baseMapper.selectFollowPage(new Page<>(pageNo, pageSize), currentUserId, trimmed);
+    }
+
+    @Override
+    public IPage<FansListVo> pageFans(String keyword, Integer page, Integer size) {
+        Long currentUserId = requireLogin();
+        int pageNo = page != null ? page : 1;
+        int pageSize = size != null ? size : 10;
+        String trimmed = StringUtils.isEmpty(keyword) ? null : keyword.trim();
+        return baseMapper.selectFansPage(new Page<>(pageNo, pageSize), currentUserId, trimmed);
+    }
+
 
     /**
      * 按 uid 解析 UP主主键id（uid为空或用户不存在时抛错）
@@ -96,6 +127,17 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
             throw new GlobeException("UP主不存在");
         }
         return followUser.getId();
+    }
+
+    /**
+     * 获取当前登录用户ID，未登录抛异常
+     */
+    private Long requireLogin() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        return currentUserId;
     }
 
     /**
@@ -115,9 +157,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

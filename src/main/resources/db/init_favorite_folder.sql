@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS public.favorite_folder (
     name        VARCHAR(50)  NOT NULL,
     is_default  SMALLINT     DEFAULT 0,
     is_private  SMALLINT     DEFAULT 0,
+    cover_url   VARCHAR(500),
+    description VARCHAR(200),
     create_time TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP,
     is_delete   SMALLINT     DEFAULT 0
@@ -18,6 +20,8 @@ COMMENT ON COLUMN public.favorite_folder.user_id      IS '所属用户ID';
 COMMENT ON COLUMN public.favorite_folder.name         IS '文件夹名称';
 COMMENT ON COLUMN public.favorite_folder.is_default   IS '1-默认文件夹，0-自定义文件夹';
 COMMENT ON COLUMN public.favorite_folder.is_private   IS '1-私密（仅本人可见），0-公开';
+COMMENT ON COLUMN public.favorite_folder.cover_url    IS '自定义封面URL（NULL表示未设置，使用最新收藏视频封面）';
+COMMENT ON COLUMN public.favorite_folder.description IS '收藏夹描述（最长200字，NULL表示未设置）';
 COMMENT ON COLUMN public.favorite_folder.create_time  IS '创建时间';
 COMMENT ON COLUMN public.favorite_folder.update_time  IS '更新时间';
 COMMENT ON COLUMN public.favorite_folder.is_delete    IS '是否删除';

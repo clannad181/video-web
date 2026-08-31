@@ -9,13 +9,11 @@ import com.cjym.videoweb.mapper.EpisodeCoinMapper;
 import com.cjym.videoweb.mapper.EpisodeFavoriteMapper;
 import com.cjym.videoweb.mapper.EpisodeLikeMapper;
 import com.cjym.videoweb.mapper.FavoriteFolderMapper;
-import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.model.entity.EpisodeCoin;
 import com.cjym.videoweb.model.entity.EpisodeFavorite;
 import com.cjym.videoweb.model.entity.EpisodeLike;
 import com.cjym.videoweb.model.entity.FavoriteFolder;
-import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.EpisodeActionStatusVo;
 import com.cjym.videoweb.model.vo.EpisodeActionVo;
@@ -53,9 +51,6 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
 
     @Resource
     private FavoriteFolderMapper favoriteFolderMapper;
-
-    @Resource
-    private UserInfoMapper userInfoMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -338,9 +333,7 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

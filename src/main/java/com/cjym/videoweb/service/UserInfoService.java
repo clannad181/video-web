@@ -2,6 +2,7 @@ package com.cjym.videoweb.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.cjym.videoweb.model.dto.ClientUserUpdateDto;
 import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
@@ -41,6 +42,13 @@ public interface UserInfoService extends IService<UserInfo> {
      * 获取前台用户基础信息（客户端，不含角色和菜单）
      * */
     R<ClientUserVo> getClientUserInfo(HttpServletRequest request);
+
+    /**
+     * 前台用户更新个人信息（仅更新传入的非空字段，至少传一个）
+     * @param request 请求（从token解析当前用户）
+     * @param dto 更新请求
+     * */
+    R<String> updateClientUserInfo(HttpServletRequest request, ClientUserUpdateDto dto);
 
     /**
      * token刷新

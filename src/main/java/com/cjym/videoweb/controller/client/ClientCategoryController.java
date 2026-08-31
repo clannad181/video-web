@@ -24,7 +24,7 @@ public class ClientCategoryController {
     private CategoryService categoryService;
 
     @GetMapping("/list")
-    @Operation(summary = "获取前台展示的分类列表", description = "获取所有启用且可见的分类，仅返回id/name/sort，按排序升序排列，供前台页面分类导航使用")
+    @Operation(summary = "获取前台展示的分类列表", description = "获取所有启用且可见的分类，仅返回id/name/sort/svg（svg为分类图标），按排序升序排列，供前台页面分类导航使用")
     public R<List<CategorySimpleVo>> list() {
         return R.success(categoryService.listEnabled());
     }

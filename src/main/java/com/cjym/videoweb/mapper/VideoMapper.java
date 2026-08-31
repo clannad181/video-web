@@ -39,10 +39,11 @@ public interface VideoMapper extends BaseMapper<Video> {
                                          @Param("avid") String avid);
 
     /**
-     * 分页查询前台展示视频（仅已发布且至少有一集审核通过），支持最新/最火热排序
+     * 分页查询前台展示视频（仅已发布且至少有一集审核通过），支持最新/最火热排序与分类筛选
      */
     IPage<ClientVideoVo> selectClientVideoPage(Page<ClientVideoVo> page,
-                                               @Param("orderColumn") String orderColumn);
+                                               @Param("orderColumn") String orderColumn,
+                                               @Param("categoryId") Long categoryId);
 
     /**
      * 相关视频推荐第一步：查询候选视频id列表（同UP主或标签有交集，排除自身，仅已发布且至少有一集审核通过）

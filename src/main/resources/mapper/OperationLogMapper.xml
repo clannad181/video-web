@@ -42,36 +42,37 @@
     </resultMap>
 
     <select id="selectOperationLogPage" resultMap="OperationLogPageDtoResultMap">
-        SELECT id, username, module, operation, method,
-               request_uri, request_method, ip_address,
-               execution_time, result_status, error_message,
-               log_type, system_type, operation_time
-        FROM public.operation_log
+        SELECT ol.id, u.user_name AS username, ol.module, ol.operation, ol.method,
+               ol.request_uri, ol.request_method, ol.ip_address,
+               ol.execution_time, ol.result_status, ol.error_message,
+               ol.log_type, ol.system_type, ol.operation_time
+        FROM public.operation_log ol
+        LEFT JOIN public.user_info u ON ol.user_id = u.id
         <where>
-            is_delete = 0
+            ol.is_delete = 0
             <if test="username != null and username != ''">
-                AND username LIKE CONCAT('%', #{username}, '%')
+                AND u.user_name LIKE CONCAT('%', #{username}, '%')
             </if>
             <if test="module != null and module != ''">
-                AND module LIKE CONCAT('%', #{module}, '%')
+                AND ol.module LIKE CONCAT('%', #{module}, '%')
             </if>
             <if test="logType != null">
-                AND log_type = #{logType}
+                AND ol.log_type = #{logType}
             </if>
             <if test="resultStatus != null">
-                AND result_status = #{resultStatus}
+                AND ol.result_status = #{resultStatus}
             </if>
             <if test="systemType != null">
-                AND system_type = #{systemType}
+                AND ol.system_type = #{systemType}
             </if>
             <if test="startTime != null and startTime != ''">
-                AND operation_time &gt;= TO_TIMESTAMP(#{startTime}, 'YYYY-MM-DD HH24:MI:SS')
+                AND ol.operation_time &gt;= TO_TIMESTAMP(#{startTime}, 'YYYY-MM-DD HH24:MI:SS')
             </if>
             <if test="endTime != null and endTime != ''">
-                AND operation_time &lt;= TO_TIMESTAMP(#{endTime}, 'YYYY-MM-DD HH24:MI:SS')
+                AND ol.operation_time &lt;= TO_TIMESTAMP(#{endTime}, 'YYYY-MM-DD HH24:MI:SS')
             </if>
         </where>
-        ORDER BY operation_time DESC
+        ORDER BY ol.operation_time DESC
     </select>
 
     <!-- 日志统计总览：单次 SQL 同时统计 login_log + operation_log -->

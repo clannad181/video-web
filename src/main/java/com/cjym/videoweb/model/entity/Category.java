@@ -31,6 +31,9 @@ public class Category {
     @Schema(description = "状态（true启用/false禁用）")
     private Boolean status;
 
+    @Schema(description = "SVG图标（前端展示分类图标使用）")
+    private String svg;
+
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT)

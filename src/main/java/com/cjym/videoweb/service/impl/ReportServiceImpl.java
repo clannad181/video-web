@@ -8,13 +8,11 @@ import com.cjym.videoweb.constant.ReportConstant;
 import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.ReportMapper;
-import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.model.dto.ReportCreateDto;
 import com.cjym.videoweb.model.dto.ReportHandleDto;
 import com.cjym.videoweb.model.entity.Report;
-import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.ReportVo;
@@ -38,9 +36,6 @@ public class ReportServiceImpl extends ServiceImpl<ReportMapper, Report> impleme
 
     @Resource
     private VideoEpisodeMapper videoEpisodeMapper;
-
-    @Resource
-    private UserInfoMapper userInfoMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -153,9 +148,7 @@ public class ReportServiceImpl extends ServiceImpl<ReportMapper, Report> impleme
             if (token.startsWith("Bearer ")) {
                 token = token.substring(7);
             }
-            String username = JWTUtil.getUsername(token);
-            UserInfo userInfo = userInfoMapper.selectByUserName(username);
-            return userInfo != null ? userInfo.getId() : null;
+            return JWTUtil.getUserId(token);
         } catch (Exception e) {
             return null;
         }

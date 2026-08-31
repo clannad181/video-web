@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @TableName(schema = "public")
@@ -48,6 +49,10 @@ public class UserInfo{
 
     @Schema(description = "性别")
     private Boolean sex;
+
+    @Schema(description = "生日")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd")
+    private LocalDate birthday;
 
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd HH:mm:ss")

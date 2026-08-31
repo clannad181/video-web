@@ -15,4 +15,10 @@ public class FavoriteFolderUpdateDto {
 
     @Schema(description = "是否私密（可选；不传则不修改可见性）")
     private Boolean isPrivate;
+
+    @Schema(description = "自定义封面URL（可选，最长500字；不传则不修改，传空字符串清除自定义封面恢复自动）")
+    private String coverUrl;
+
+    @Schema(description = "收藏夹描述（可选，最长200字；不传则不修改，传空字符串清除描述）")
+    private String description;
 }

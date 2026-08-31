@@ -2,10 +2,12 @@ package com.cjym.videoweb.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.micrometer.common.util.StringUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Data
 @TableName(value = "video_episode", schema = "public")
@@ -70,6 +72,9 @@ public class VideoEpisode {
     }
 
     public boolean equalsObj(String title, String playUrl) {
-        return title.equals(this.getTitle())&&playUrl.equals(this.getPlayUrl());
+        if (StringUtils.isEmpty(title)) {
+            return Objects.equals(playUrl, this.getPlayUrl());
+        }
+        return title.equals(this.getTitle()) && Objects.equals(playUrl, this.getPlayUrl());
     }
 }

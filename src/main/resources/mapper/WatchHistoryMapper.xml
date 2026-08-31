@@ -22,6 +22,8 @@
         <result column="video_avid" property="videoAvid" jdbcType="VARCHAR"/>
         <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
         <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
+        <result column="nick_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="avatar_url" property="avatarUrl" jdbcType="VARCHAR"/>
         <result column="episode_id" property="episodeId" jdbcType="BIGINT"/>
         <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
         <result column="episode_title" property="episodeTitle" jdbcType="VARCHAR"/>
@@ -46,12 +48,15 @@
                 vi.avid       AS video_avid,
                 vi.title      AS video_title,
                 vi.cover_url  AS video_cover,
+                u.nike_name   AS nick_name,
+                u.avatar      AS avatar_url,
                 ve.avid       AS episode_avid,
                 ve.title      AS episode_title,
                 ve.episode_number
             FROM public.watch_history wh
             LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
             LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
+            LEFT JOIN public.user_info u ON u.id = vi.user_id
             WHERE wh.is_delete = 0
               AND wh.user_id = #{userId}
             ORDER BY wh.video_id, wh.watch_time DESC
@@ -69,6 +74,90 @@
               AND wh.user_id = #{userId}
             ORDER BY wh.video_id, wh.watch_time DESC
         ) t
+    </select>
+
+    <!-- ==================== 观看历史按日期分组（搜索） ==================== -->
+
+    <sql id="HistoryKeywordFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (vi.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR ve.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.nike_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </sql>
+
+    <sql id="HistoryDateRangeFilter">
+        <if test="startDate != null">
+            AND wh.watch_time::date &gt;= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND wh.watch_time::date &lt;= #{endDate}
+        </if>
+    </sql>
+
+    <!-- 分页查询观看月份（按月去重倒序，支持关键字和时间范围过滤） -->
+    <select id="selectHistoryMonthPage" resultType="java.time.LocalDate">
+        SELECT DISTINCT date_trunc('month', wh.watch_time)::date
+        FROM public.watch_history wh
+        LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
+        LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
+        LEFT JOIN public.user_info u ON u.id = vi.user_id
+        <where>
+            wh.is_delete = 0
+            AND wh.user_id = #{userId}
+            <include refid="HistoryDateRangeFilter"/>
+            <include refid="HistoryKeywordFilter"/>
+        </where>
+        ORDER BY date_trunc('month', wh.watch_time)::date DESC
+    </select>
+
+    <!-- 观看月份分页统计（与主查询口径一致，供分页插件直接调用） -->
+    <select id="selectHistoryMonthPage_COUNT" resultType="long">
+        SELECT COUNT(DISTINCT date_trunc('month', wh.watch_time)::date)
+        FROM public.watch_history wh
+        LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
+        LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
+        LEFT JOIN public.user_info u ON u.id = vi.user_id
+        <where>
+            wh.is_delete = 0
+            AND wh.user_id = #{userId}
+            <include refid="HistoryDateRangeFilter"/>
+            <include refid="HistoryKeywordFilter"/>
+        </where>
+    </select>
+
+    <!-- 按月份列表查询观看历史记录（按观看时间倒序） -->
+    <select id="selectHistoryByMonths" resultMap="WatchHistoryVoResultMap">
+        SELECT wh.id,
+               wh.user_id,
+               wh.video_id,
+               wh.episode_id,
+               wh.watched_seconds,
+               wh.play_link,
+               wh.watch_time,
+               vi.avid       AS video_avid,
+               vi.title      AS video_title,
+               vi.cover_url  AS video_cover,
+               u.nike_name   AS nick_name,
+               u.avatar      AS avatar_url,
+               ve.avid       AS episode_avid,
+               ve.title      AS episode_title,
+               ve.episode_number
+        FROM public.watch_history wh
+        LEFT JOIN public.video_info vi ON vi.id = wh.video_id AND vi.is_delete = 0
+        LEFT JOIN public.video_episode ve ON ve.id = wh.episode_id AND ve.is_delete = 0
+        LEFT JOIN public.user_info u ON u.id = vi.user_id
+        <where>
+            wh.is_delete = 0
+            AND wh.user_id = #{userId}
+            AND date_trunc('month', wh.watch_time)::date IN
+            <foreach collection="months" item="m" open="(" separator="," close=")">
+                #{m}
+            </foreach>
+            <include refid="HistoryDateRangeFilter"/>
+            <include refid="HistoryKeywordFilter"/>
+        </where>
+        ORDER BY wh.watch_time DESC
     </select>
 
     <!-- ==================== 每日播放量统计 ==================== -->

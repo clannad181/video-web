@@ -66,7 +66,7 @@ public class    CategoryController {
     }
 
     @GetMapping("/enabled")
-    @Operation(summary = "获取启用中的分类列表", description = "获取所有 status=true 的分类，仅返回id/name/sort，按排序升序排列，供下拉选择使用")
+    @Operation(summary = "获取启用中的分类列表", description = "获取所有 status=true 的分类，仅返回id/name/sort/svg，按排序升序排列，供下拉选择使用")
     public R<List<CategorySimpleVo>> listEnabled() {
         return R.success(categoryService.listEnabled());
     }

@@ -1,7 +1,10 @@
 package com.cjym.videoweb.model.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
+import java.time.LocalDate;
 
 @Data
 @Schema(description = "更新用户请求")
@@ -33,6 +36,10 @@ public class UserUpdateVo {
 
     @Schema(description = "性别")
     private Boolean sex;
+
+    @Schema(description = "生日")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private LocalDate birthday;
 
     @Schema(description = "用户个性签名")
     private String descript;

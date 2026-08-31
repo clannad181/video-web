@@ -8,6 +8,10 @@ public class FavoriteConstant {
     public static final String FOLDER_PREFIX = "fd";
     /** 收藏夹名称最大长度 */
     public static final int FOLDER_NAME_MAX_LENGTH = 20;
+    /** 收藏夹自定义封面URL最大长度 */
+    public static final int FOLDER_COVER_MAX_LENGTH = 500;
+    /** 收藏夹描述最大长度 */
+    public static final int FOLDER_DESC_MAX_LENGTH = 200;
     /** 每用户收藏夹数量上限 */
     public static final int FOLDER_COUNT_MAX = 50;
     /** 收藏夹可见性：公开 */

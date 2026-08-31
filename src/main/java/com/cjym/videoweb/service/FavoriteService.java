@@ -9,6 +9,7 @@ import com.cjym.videoweb.model.dto.FavoriteRemoveDto;
 import com.cjym.videoweb.model.dto.FavoriteSearchDto;
 import com.cjym.videoweb.model.vo.FavoriteEpisodeVo;
 import com.cjym.videoweb.model.vo.FavoriteFolderDetailVo;
+import com.cjym.videoweb.model.vo.FavoriteSearchVo;
 
 public interface FavoriteService {
 
@@ -37,12 +38,12 @@ public interface FavoriteService {
     /**
      * 分页搜索当前用户的收藏（按剧集去重，取最新收藏记录）
      *
-     * <p>folderUid 为空时在全部收藏夹中搜索，否则仅搜索指定收藏夹；title 为空时返回全部，否则模糊匹配剧集标题或视频标题</p>
+     * <p>folderUid 为空时在全部收藏夹中搜索，否则仅搜索指定收藏夹；title 为空时返回全部，否则模糊匹配剧集标题、视频标题、UP主昵称与UP主uid；返回结果含UP主完整公开信息</p>
      *
      * @param dto 搜索请求体，page/size 缺省为 1/10
      * @return 收藏剧集分页列表（按收藏时间倒序）
      */
-    IPage<FavoriteEpisodeVo> pageSearch(FavoriteSearchDto dto);
+    IPage<FavoriteSearchVo> pageSearch(FavoriteSearchDto dto);
 
     /**
      * 分页查询他人公开收藏夹内的收藏列表（私密夹不可见）
