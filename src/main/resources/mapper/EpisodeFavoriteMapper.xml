@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.EpisodeFavoriteMapper">
+
+    <resultMap id="FavoriteSearchVoResultMap" type="com.cjym.videoweb.model.vo.FavoriteSearchVo">
+        <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
+        <result column="episode_title" property="episodeTitle" jdbcType="VARCHAR"/>
+        <result column="episode_number" property="episodeNumber" jdbcType="INTEGER"/>
+        <result column="duration" property="duration" jdbcType="BIGINT"/>
+        <result column="video_avid" property="videoAvid" jdbcType="VARCHAR"/>
+        <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
+        <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
+        <result column="nick_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="avatar_url" property="avatarUrl" jdbcType="VARCHAR"/>
+        <result column="play_link" property="playLink" jdbcType="VARCHAR"/>
+        <result column="favorite_time" property="favoriteTime" jdbcType="TIMESTAMP"/>
+        <association property="upUser" javaType="com.cjym.videoweb.model.vo.UpUserVo" columnPrefix="up_">
+            <result column="uid" property="uid" jdbcType="VARCHAR"/>
+            <result column="nike_name" property="nikeName" jdbcType="VARCHAR"/>
+            <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
+            <result column="descript" property="descript" jdbcType="VARCHAR"/>
+            <result column="sex" property="sex" jdbcType="BOOLEAN"/>
+            <result column="is_vip" property="isVip" jdbcType="BOOLEAN"/>
+            <result column="follow_count" property="followCount" jdbcType="BIGINT"/>
+            <result column="fans_count" property="fansCount" jdbcType="BIGINT"/>
+            <result column="total_like_count" property="totalLikeCount" jdbcType="BIGINT"/>
+            <result column="total_play_count" property="totalPlayCount" jdbcType="BIGINT"/>
+        </association>
+    </resultMap>
+
+    <!-- 分页搜索用户收藏：按剧集去重（取最新收藏时间），folderId 为空时搜索全部收藏夹，关键字为空时查询全部，按收藏时间倒序；
+         关键字同时模糊匹配剧集标题、视频标题、UP主昵称与UP主uid，并返回UP主完整公开信息 -->
+    <select id="selectFavoriteSearchPage" resultMap="FavoriteSearchVoResultMap">
+        SELECT e.avid      AS episode_avid,
+               e.title     AS episode_title,
+               e.episode_number,
+               e.duration,
+               v.avid      AS video_avid,
+               v.title     AS video_title,
+               v.cover_url AS video_cover,
+               u.nike_name AS nick_name,
+               u.avatar    AS avatar_url,
+               CONCAT('/client/video/', v.avid, '/episode/', e.avid) AS play_link,
+               t.favorite_time,
+               u.uid       AS up_uid,
+               u.nike_name AS up_nike_name,
+               u.avatar    AS up_avatar,
+               u.descript  AS up_descript,
+               u.sex       AS up_sex,
+               u.is_vip    AS up_is_vip,
+               (SELECT COUNT(*) FROM public.user_follow f
+                WHERE f.user_id = u.id AND f.is_delete = 0) AS up_follow_count,
+               (SELECT COUNT(*) FROM public.user_follow f
+                WHERE f.follow_user_id = u.id AND f.is_delete = 0) AS up_fans_count,
+               (SELECT COALESCE(SUM(ue.like_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS up_total_like_count,
+               (SELECT COALESCE(SUM(ue.play_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS up_total_play_count
+        FROM (
+            SELECT ef.episode_id, MAX(ef.create_time) AS favorite_time
+            FROM public.episode_favorite ef
+            WHERE ef.user_id = #{userId}
+              AND ef.status = 1
+            <if test="folderId != null">
+              AND ef.folder_id = #{folderId}
+            </if>
+            GROUP BY ef.episode_id
+        ) t
+        INNER JOIN public.video_episode e ON e.id = t.episode_id AND e.is_delete = 0
+        INNER JOIN public.video_info v ON v.id = e.video_id AND v.is_delete = 0
+        LEFT JOIN public.user_info u ON u.id = v.user_id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (e.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR v.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.nike_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.uid LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY t.favorite_time DESC
+    </select>
+
+</mapper>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.EpisodeCoinMapper">
+
+    <resultMap id="RecentActionEpisodeResultMap" type="com.cjym.videoweb.model.vo.RecentActionEpisodeVo">
+        <result column="video_avid" property="videoAvid" jdbcType="VARCHAR"/>
+        <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
+        <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
+        <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
+        <result column="episode_title" property="episodeTitle" jdbcType="VARCHAR"/>
+        <result column="episode_number" property="episodeNumber" jdbcType="INTEGER"/>
+        <result column="like_count" property="likeCount" jdbcType="BIGINT"/>
+        <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
+        <result column="play_count" property="playCount" jdbcType="BIGINT"/>
+        <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatarUrl" jdbcType="VARCHAR"/>
+        <result column="action_time" property="actionTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 最近投币的剧集列表：每个视频仅保留最近投币的一集，按投币时间倒序 -->
+    <select id="selectRecentCoinEpisodes" resultMap="RecentActionEpisodeResultMap">
+        SELECT *
+        FROM (
+            SELECT DISTINCT ON (ve.video_id)
+                ec.create_time AS action_time,
+                vi.avid       AS video_avid,
+                vi.title      AS video_title,
+                vi.cover_url  AS video_cover,
+                ve.avid       AS episode_avid,
+                ve.title      AS episode_title,
+                ve.episode_number,
+                ve.like_count,
+                ve.favorite_count,
+                ve.play_count,
+                u.nike_name,
+                u.avatar
+            FROM public.episode_coin ec
+            INNER JOIN public.video_episode ve ON ve.id = ec.episode_id AND ve.is_delete = 0
+            INNER JOIN public.video_info vi ON vi.id = ve.video_id AND vi.is_delete = 0
+            LEFT JOIN public.user_info u ON u.id = vi.user_id
+            WHERE ec.user_id = #{userId}
+            ORDER BY ve.video_id, ec.create_time DESC
+        ) t
+        ORDER BY t.action_time DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

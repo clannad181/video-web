@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.FollowMapper">
+
+    <resultMap id="FollowListVoResultMap" type="com.cjym.videoweb.model.vo.FollowListVo">
+        <result column="uid" property="uid" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nikeName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
+        <result column="descript" property="descript" jdbcType="VARCHAR"/>
+        <result column="sex" property="sex" jdbcType="BOOLEAN"/>
+        <result column="is_vip" property="isVip" jdbcType="BOOLEAN"/>
+        <result column="follow_count" property="followCount" jdbcType="BIGINT"/>
+        <result column="fans_count" property="fansCount" jdbcType="BIGINT"/>
+        <result column="total_like_count" property="totalLikeCount" jdbcType="BIGINT"/>
+        <result column="total_play_count" property="totalPlayCount" jdbcType="BIGINT"/>
+        <result column="follow_time" property="followTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <resultMap id="FansListVoResultMap" type="com.cjym.videoweb.model.vo.FansListVo" extends="FollowListVoResultMap">
+        <result column="followed_back" property="followedBack" jdbcType="BOOLEAN"/>
+    </resultMap>
+
+    <!-- 分页查询当前用户关注的UP主列表：含UP主公开信息（关注数/粉丝数/累计获赞/累计播放），按关注时间倒序；keyword 非空时模糊匹配UP主昵称或uid -->
+    <select id="selectFollowPage" resultMap="FollowListVoResultMap">
+        SELECT u.uid,
+               u.nike_name,
+               u.avatar,
+               u.descript,
+               u.sex,
+               u.is_vip,
+               f.create_time AS follow_time,
+               (SELECT COUNT(*) FROM public.user_follow f1
+                WHERE f1.user_id = u.id AND f1.is_delete = 0) AS follow_count,
+               (SELECT COUNT(*) FROM public.user_follow f1
+                WHERE f1.follow_user_id = u.id AND f1.is_delete = 0) AS fans_count,
+               (SELECT COALESCE(SUM(ue.like_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS total_like_count,
+               (SELECT COALESCE(SUM(ue.play_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS total_play_count
+        FROM public.user_follow f
+        INNER JOIN public.user_info u ON u.id = f.follow_user_id AND u.is_delete = 0
+        WHERE f.user_id = #{userId}
+          AND f.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+          AND (u.nike_name LIKE CONCAT('%', #{keyword}, '%')
+               OR u.uid LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY f.create_time DESC
+    </select>
+
+    <!-- 分页查询当前用户粉丝列表：含粉丝公开信息（关注数/粉丝数/累计获赞/累计播放）与是否已回关，按关注时间倒序；
+         keyword 非空时模糊匹配粉丝昵称或uid -->
+    <select id="selectFansPage" resultMap="FansListVoResultMap">
+        SELECT u.uid,
+               u.nike_name,
+               u.avatar,
+               u.descript,
+               u.sex,
+               u.is_vip,
+               f.create_time AS follow_time,
+               (SELECT COUNT(*) FROM public.user_follow f1
+                WHERE f1.user_id = u.id AND f1.is_delete = 0) AS follow_count,
+               (SELECT COUNT(*) FROM public.user_follow f1
+                WHERE f1.follow_user_id = u.id AND f1.is_delete = 0) AS fans_count,
+               (SELECT COALESCE(SUM(ue.like_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS total_like_count,
+               (SELECT COALESCE(SUM(ue.play_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS total_play_count,
+               EXISTS(SELECT 1 FROM public.user_follow f2
+                      WHERE f2.user_id = #{userId}
+                        AND f2.follow_user_id = u.id
+                        AND f2.is_delete = 0) AS followed_back
+        FROM public.user_follow f
+        INNER JOIN public.user_info u ON u.id = f.user_id AND u.is_delete = 0
+        WHERE f.follow_user_id = #{userId}
+          AND f.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+          AND (u.nike_name LIKE CONCAT('%', #{keyword}, '%')
+               OR u.uid LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY f.create_time DESC
+    </select>
+
+</mapper>
