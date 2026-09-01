@@ -1,10 +1,17 @@
 package com.cjym.videoweb.controller.client;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cjym.videoweb.model.dto.EpisodePageDto;
+import com.cjym.videoweb.model.dto.EpisodeUpdateDto;
 import com.cjym.videoweb.model.dto.VideoContributeDto;
+import com.cjym.videoweb.model.dto.VideoEpisodeAddDto;
+import com.cjym.videoweb.model.dto.VideoOngoingToggleDto;
+import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.MonthlyContributionVo;
+import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.VideoVo;
+import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,11 +66,22 @@ public class ClientVideoController {
     }
 
     @GetMapping("/mine")
-    @Operation(summary = "我的投稿", description = "获取当前登录用户指定时间范围内的投稿视频（含全部状态），按月份分组（yyyy-MM，倒序），组内按投稿时间倒序")
-    public R<List<MonthlyContributionVo>> mine(
-            @Parameter(description = "开始日期（含），格式 yyyy-MM-dd") @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-            @Parameter(description = "结束日期（含），格式 yyyy-MM-dd") @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
-        return R.success(videoService.listMyContributions(startDate, endDate));
+    @Operation(summary = "我的投稿", description = "双模式：startDate与endDate均传时按时间范围查询并按月份分组（yyyy-MM倒序，组内按投稿时间倒序）返回；均不传时改为普通分页查询（page/size默认1/10，videoStatus可选按状态筛选0-草稿1-待发布2-已发布3-已下架，title可选标题模糊搜索），按投稿时间倒序；每条记录含播放跳转链接playLink（优先最新审核通过剧集，无则回退到最新剧集供作者预览）")
+    public R<Object> mine(
+            @Parameter(description = "开始日期（含），格式 yyyy-MM-dd，需与endDate同时传") @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+            @Parameter(description = "结束日期（含），格式 yyyy-MM-dd，需与startDate同时传") @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            @Parameter(description = "页码（分页模式，默认1）") @RequestParam(required = false) Integer page,
+            @Parameter(description = "每页条数（分页模式，默认10）") @RequestParam(required = false) Integer size,
+            @Parameter(description = "视频状态筛选（分页模式）：0-草稿，1-待发布，2-已发布，3-已下架") @RequestParam(required = false) Integer videoStatus,
+            @Parameter(description = "标题模糊搜索（分页模式）") @RequestParam(required = false) String title) {
+        // 日期参数需成对传入：均传走按月分组模式，均不传走分页模式
+        if (startDate != null && endDate != null) {
+            return R.success(videoService.listMyContributions(startDate, endDate));
+        }
+        if (startDate != null || endDate != null) {
+            throw new GlobeException("开始时间和结束时间需同时传入");
+        }
+        return R.success(videoService.pageMyContributions(page, size, videoStatus, title));
     }
 
     @PostMapping("/contribute")
@@ -93,5 +111,38 @@ public class ClientVideoController {
     public R<VideoVo> contributeDetail(
             @Parameter(description = "视频avid") @RequestParam String videoUid) {
         return R.success(videoService.getContributionDetail(videoUid));
+    }
+
+    @PostMapping("/contribute/ongoing/toggle")
+    @Operation(summary = "切换连载状态", description = "按视频avid快速切换自己投稿的连载状态（自动取反，连载中→已完结、已完结→连载中），仅上传者可操作，返回切换后的连载状态")
+    public R<Boolean> toggleOngoing(@RequestBody VideoOngoingToggleDto dto) {
+        return R.success(videoService.toggleOngoing(dto.getVideoUid()));
+    }
+
+    @PostMapping("/contribute/episode/add")
+    @Operation(summary = "添加剧集", description = "给连载中的自己投稿添加新剧集（按视频avid定位，集数序号与排序不传时自动追加到末尾），仅上传者可操作，审核流程跟随免审配置")
+    public R<VideoEpisode> addEpisode(@RequestBody VideoEpisodeAddDto dto) {
+        return R.success(videoService.addEpisode(dto));
+    }
+
+    @PostMapping("/contribute/episode/list")
+    @Operation(summary = "剧集分页查询", description = "按视频avid分页查询自己投稿的剧集（仅上传者可查），多条件：title剧集标题模糊搜索、reviewStatus审核状态筛选（0-待审核，1-审核通过，2-审核拒绝），按排序与集数序号降序，每条含播放跳转链接")
+    public R<IPage<VideoEpisodeVo>> episodeList(@RequestBody EpisodePageDto dto) {
+        return R.success(videoService.pageMyEpisodes(dto));
+    }
+
+    @PostMapping("/contribute/episode/update")
+    @Operation(summary = "编辑剧集", description = "按剧集avid编辑自己投稿的剧集（仅上传者可操作，集数序号与排序不传时保持原值），标题或播放地址变更时重置审核状态为待审核，并重算视频总集数与总时长")
+    public R<String> updateEpisode(@RequestBody EpisodeUpdateDto dto) {
+        videoService.updateEpisode(dto);
+        return R.success("编辑成功");
+    }
+
+    @GetMapping("/contribute/episode/delete")
+    @Operation(summary = "删除剧集", description = "按剧集avid删除自己投稿的剧集（仅上传者可操作，仅连载中视频可删除），并重算视频总集数与总时长")
+    public R<String> deleteEpisode(
+            @Parameter(description = "剧集avid") @RequestParam String episodeUid) {
+        videoService.deleteEpisodeByUid(episodeUid);
+        return R.success("删除成功");
     }
 }

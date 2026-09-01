@@ -19,4 +19,6 @@ public class VideoConstant {
     public static final String SORT_LATEST = "latest";
     /** 前台视频排序类型：最火热（按播放量倒序） */
     public static final String SORT_HOT = "hot";
+    /** 前台视频排序类型：最多收藏（按收藏数倒序） */
+    public static final String SORT_FAVORITE = "favorite";
 }

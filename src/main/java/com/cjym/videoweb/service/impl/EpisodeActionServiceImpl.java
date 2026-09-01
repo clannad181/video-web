@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.CommentConstant;
+import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.EpisodeCoinMapper;
 import com.cjym.videoweb.mapper.EpisodeFavoriteMapper;
@@ -67,6 +68,10 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
                 new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
         if (episode == null) {
             throw new GlobeException("剧集不存在");
+        }
+        // 剧集未审核通过时不允许点赞
+        if (episode.getReviewStatus() == null || episode.getReviewStatus() != VideoConstant.REVIEW_APPROVED) {
+            throw new GlobeException("剧集未审核通过，无法点赞");
         }
 
         Long episodeId = episode.getId();
@@ -140,6 +145,10 @@ public class EpisodeActionServiceImpl implements EpisodeActionService {
                 new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, episodeUid));
         if (episode == null) {
             throw new GlobeException("剧集不存在");
+        }
+        // 剧集未审核通过时不允许投币
+        if (episode.getReviewStatus() == null || episode.getReviewStatus() != VideoConstant.REVIEW_APPROVED) {
+            throw new GlobeException("剧集未审核通过，无法投币");
         }
 
         Long episodeId = episode.getId();

@@ -25,6 +25,7 @@ import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.model.vo.ClientUserVo;
+import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
 import com.cjym.videoweb.model.vo.UserEpisodeStatsVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
@@ -35,6 +36,7 @@ import com.cjym.videoweb.model.vo.UserStatsVo;
 import com.cjym.videoweb.model.vo.UserVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EmailSendService;
+import com.cjym.videoweb.service.EsSearchService;
 import com.cjym.videoweb.service.TokenExpiryConfigService;
 import com.cjym.videoweb.service.UserInfoService;
 import com.cjym.videoweb.service.WebConfigService;
@@ -46,7 +48,9 @@ import io.github.eternalstone.captcha.gp.captcha.SpecCaptcha;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -61,6 +65,7 @@ import java.util.regex.Pattern;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> implements UserInfoService {
     @Resource
@@ -92,6 +97,12 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     @Resource
     private WebConfigService webConfigService;
+
+    /**
+     * ES 聚合搜索服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（搜索走数据库）
+     */
+    @Resource
+    private ObjectProvider<EsSearchService> esSearchServiceProvider;
 
     private static final String fromEmail="2657463589@qq.com";
 
@@ -301,6 +312,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         userInfo.setBirthday(dto.getBirthday());
         userInfo.setDescript(dto.getDescript());
         baseMapper.updateById(userInfo);
+        // 同步 ES 索引（昵称/头像/签名变更影响UP主搜索展示）
+        refreshUserEs(userId);
         return R.success("修改成功");
     }
 
@@ -402,6 +415,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                     ? Long.valueOf(defaultRoleValue) : BaseConstant.DEFAULT_FRONT_USER_ROLE_ID);
         }
         baseMapper.insert(userInfo);
+        // 同步 ES 索引
+        refreshUserEs(userInfo.getId());
         return R.success("新增用户成功");
     }
 
@@ -448,7 +463,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
             wrapper.set(UserInfo::getDescript, userUpdateVo.getDescript());
         }
         baseMapper.update(null, wrapper);
-
+        // 同步 ES 索引
+        refreshUserEs(userUpdateVo.getId());
         return R.success("更新用户成功");
     }
 
@@ -463,6 +479,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
         // 逻辑删除（@TableLogic 自动处理）
         baseMapper.deleteById(id);
+        // 同步 ES 索引（refreshUser 查不到用户时会删除文档）
+        refreshUserEs(id);
         return R.success("删除用户成功");
     }
 
@@ -489,6 +507,59 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         vo.setYesterdayNewCount(null);
         vo.setYesterdayActiveCount(null);
         return vo;
+    }
+
+    /**
+     * UP主搜索排序类型 → ORDER BY 列 映射（fans:按粉丝数 like:按累计获赞 play:按累计播放）
+     */
+    private static final Map<String, String> UP_SEARCH_SORT_COLUMN_MAP = Map.of(
+            "fans", "fans_count",
+            "like", "total_like_count",
+            "play", "total_play_count"
+    );
+
+    @Override
+    public IPage<UpUserVo> pageSearchUp(String keyword, Integer page, Integer size, String sortType) {
+        // ES 已装配且 web_config 开关开启：走 Elasticsearch，异常自动降级数据库查询
+        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
+        if (esSearchService != null && isEsSearchEnabled()) {
+            try {
+                return esSearchService.searchUp(keyword, page, size, sortType);
+            } catch (Exception e) {
+                log.warn("ES UP主搜索失败，降级为数据库查询: {}", e.getMessage());
+            }
+        }
+        int pageNum = page != null ? page : 1;
+        int pageSize = size != null ? size : 10;
+        // 排序白名单解析：非法值返回 null（走默认粉丝数降序）
+        String orderColumn = UP_SEARCH_SORT_COLUMN_MAP.get(
+                sortType == null || sortType.isBlank() ? "fans" : sortType.trim().toLowerCase());
+        String trimKeyword = StringUtils.isNotEmpty(keyword) ? keyword.trim() : null;
+        return baseMapper.selectSearchUpPage(new Page<>(pageNum, pageSize), trimKeyword, orderColumn);
+    }
+
+    /**
+     * 聚合搜索是否走 Elasticsearch（web_config 中 search/es_search 配置，Redis缓存优先）
+     */
+    private boolean isEsSearchEnabled() {
+        String value = webConfigService.getConfigValue(
+                BaseConstant.WEB_CONFIG_CATEGORY_SEARCH, BaseConstant.WEB_CONFIG_KEY_ES_SEARCH);
+        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(value);
+    }
+
+    /**
+     * 用户变更后同步 ES 索引（ES 未装配或同步失败时静默忽略，不影响主流程）
+     */
+    private void refreshUserEs(Long userId) {
+        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
+        if (esSearchService == null) {
+            return;
+        }
+        try {
+            esSearchService.refreshUser(userId);
+        } catch (Exception e) {
+            log.warn("同步用户到 ES 失败 userId={}: {}", userId, e.getMessage());
+        }
     }
 
     public void saveRefreshToken(String refreshToken,String username) {

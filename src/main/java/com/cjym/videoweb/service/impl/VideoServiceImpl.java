@@ -13,7 +13,10 @@ import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.WebConfigMapper;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.VideoConstant;
+import com.cjym.videoweb.model.dto.EpisodePageDto;
+import com.cjym.videoweb.model.dto.EpisodeUpdateDto;
 import com.cjym.videoweb.model.dto.VideoContributeDto;
+import com.cjym.videoweb.model.dto.VideoEpisodeAddDto;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
@@ -27,6 +30,7 @@ import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
+import com.cjym.videoweb.model.vo.DataCenterVo;
 import com.cjym.videoweb.model.vo.MonthlyContributionVo;
 import com.cjym.videoweb.model.vo.MyContributionVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
@@ -37,8 +41,10 @@ import com.cjym.videoweb.model.vo.WebConfigVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CategoryService;
 import com.cjym.videoweb.service.CommentService;
+import com.cjym.videoweb.service.EsSearchService;
 import com.cjym.videoweb.service.VideoService;
 import com.cjym.videoweb.service.WatchHistoryService;
+import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.Base62Converter;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.SnowflakeIdGenerator;
@@ -48,7 +54,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +77,7 @@ import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+@Slf4j
 @Service
 public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements VideoService {
 
@@ -101,6 +110,15 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Resource
     private CommentService commentService;
+
+    @Resource
+    private WebConfigService webConfigService;
+
+    /**
+     * ES 聚合搜索服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（搜索走数据库）
+     */
+    @Resource
+    private ObjectProvider<EsSearchService> esSearchServiceProvider;
 
     /**
      * 排序字段编码 → SELECT 别名 映射（1:总时长 2:播放量 3:收藏数 4:创建时间）
@@ -231,15 +249,21 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (videoVo == null) {
             throw new GlobeException("视频不存在");
         }
-        // 前台仅可播放已发布的视频
-        if (videoVo.getVideoStatus() == null || videoVo.getVideoStatus() != VideoConstant.VIDEO_STATUS_PUBLISHED) {
+        // 未发布视频仅作者本人可预览（普通用户不可播放）
+        Long currentUserId = getCurrentUserId();
+        boolean isOwner = currentUserId != null && currentUserId.equals(videoVo.getUserId());
+        boolean published = videoVo.getVideoStatus() != null
+                && videoVo.getVideoStatus() == VideoConstant.VIDEO_STATUS_PUBLISHED;
+        if (!published && !isOwner) {
             throw new GlobeException("视频未发布，无法播放");
         }
-        // 查询审核通过的剧集（前台仅展示审核通过的剧集）
+        // 剧集查询：普通用户仅展示审核通过的剧集，作者预览可见全部剧集
         LambdaQueryWrapper<VideoEpisode> epWrapper = new LambdaQueryWrapper<>();
-        epWrapper.eq(VideoEpisode::getVideoId, videoVo.getId())
-                .eq(VideoEpisode::getReviewStatus, VideoConstant.REVIEW_APPROVED)
-                .orderByAsc(VideoEpisode::getSort, VideoEpisode::getEpisodeNumber);
+        epWrapper.eq(VideoEpisode::getVideoId, videoVo.getId());
+        if (!isOwner) {
+            epWrapper.eq(VideoEpisode::getReviewStatus, VideoConstant.REVIEW_APPROVED);
+        }
+        epWrapper.orderByAsc(VideoEpisode::getSort, VideoEpisode::getEpisodeNumber);
         List<VideoEpisode> episodes = videoEpisodeMapper.selectList(epWrapper);
         List<VideoEpisodeVo> episodeVos = episodes.stream().map(ep -> {
             VideoEpisodeVo epVo = new VideoEpisodeVo();
@@ -254,13 +278,15 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         VideoEpisode currentEpisodeEntity = episodes.stream()
                 .filter(ep -> episodeUid.equals(ep.getAvid()))
                 .findFirst()
-                .orElseThrow(() -> new GlobeException("剧集不存在或未通过审核"));
-        // 剧集播放数+1（SQL原子自增，避免并发丢失更新）
-        videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
-                .eq(VideoEpisode::getId, currentEpisodeEntity.getId())
-                .setSql("play_count = play_count + 1"));
-        // 用户已登录时记录观看历史
-        watchHistoryService.recordPlay(videoVo.getId(), currentEpisodeEntity.getId());
+                .orElseThrow(() -> new GlobeException(isOwner ? "剧集不存在" : "剧集不存在或未通过审核"));
+        // 剧集播放数+1（仅已发布视频统计，作者预览未发布稿件不计入播放量）
+        if (published) {
+            videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                    .eq(VideoEpisode::getId, currentEpisodeEntity.getId())
+                    .setSql("play_count = play_count + 1"));
+            // 用户已登录时记录观看历史
+            watchHistoryService.recordPlay(videoVo.getId(), currentEpisodeEntity.getId());
+        }
         VideoEpisodeVo currentEpisode = new VideoEpisodeVo();
         BeanUtils.copyProperties(currentEpisodeEntity, currentEpisode);
         // 当前剧集同样填充播放跳转链接
@@ -390,6 +416,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         // 更新视频的总集数和总时长
         recalculateVideoStats(video.getId());
+        // 同步 ES 索引
+        refreshVideoEs(video.getId());
         return video;
     }
 
@@ -416,6 +444,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (dto.getEpisodes() != null) {
             syncEpisodes(existVideo, dto.getEpisodes());
         }
+        // 同步 ES 索引
+        refreshVideoEs(existVideo.getId());
     }
 
     @Override
@@ -435,6 +465,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
         // 删除视频（标签随视频一并删除，无需单独处理）
         baseMapper.deleteById(id);
+        // 删除 ES 索引文档
+        deleteVideoEs(id);
     }
 
     @Override
@@ -448,6 +480,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
             throw new GlobeException("视频不存在");
         }
         syncEpisodes(video, dto.getEpisodes());
+        // 同步 ES 索引
+        refreshVideoEs(video.getId());
         return R.success();
     }
 
@@ -488,6 +522,10 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                             .set(VideoEpisode::getReviewStatus, reviewStatus));
                     keepIds.add(ep.getId());
                 } else {
+                    if (epDto.getId() != null) {
+                        // 提交的剧集id在库中不存在（已被删除），按异常处理而非新增，防止已删除剧集被重新插入
+                        throw new GlobeException("剧集不存在或已被删除");
+                    }
                     if (!Boolean.TRUE.equals(video.getIsOngoing())) {
                         throw new GlobeException("已完结的视频不能添加新剧集");
                     }
@@ -521,6 +559,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         episode.setReviewStatus(reviewStatus);
         videoEpisodeMapper.updateById(episode);
+        // 同步 ES 索引（审核结果影响剧集是否可搜索）
+        refreshVideoEs(episode.getVideoId());
     }
 
     @Override
@@ -535,6 +575,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         Long videoId = episode.getVideoId();
         videoEpisodeMapper.deleteById(episodeId);
         recalculateVideoStats(videoId);
+        // 同步 ES 索引
+        refreshVideoEs(videoId);
     }
 
     @Override
@@ -605,10 +647,11 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         // 查询时间范围内的投稿（结束日期含当天，SQL 使用左闭右开区间），已按投稿时间倒序
         List<MyContributionVideoVo> videos = baseMapper.selectMyContributions(
                 currentUserId, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay());
-        // 填充播放跳转链接（无审核通过剧集时不填充）
+        // 填充播放跳转链接：优先最新审核通过剧集，无审核通过剧集时回退到最新剧集（作者预览待审核稿件）
         videos.forEach(vo -> {
-            if (vo.getAvid() != null && vo.getEpisodeAvid() != null) {
-                vo.setPlayLink("/client/video/" + vo.getAvid() + "/episode/" + vo.getEpisodeAvid());
+            String episodeAvid = vo.getEpisodeAvid() != null ? vo.getEpisodeAvid() : vo.getLatestEpisodeAvid();
+            if (vo.getAvid() != null && episodeAvid != null) {
+                vo.setPlayLink("/client/video/" + vo.getAvid() + "/episode/" + episodeAvid);
             }
         });
         // 按月份分组（LinkedHashMap 保持组内投稿时间倒序）
@@ -629,6 +672,27 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                     return group;
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public IPage<MyContributionVideoVo> pageMyContributions(Integer page, Integer size, Integer videoStatus, String title) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        int pageNum = page != null ? page : 1;
+        int pageSize = size != null ? size : 10;
+        IPage<MyContributionVideoVo> result = baseMapper.selectMyContributionsPage(
+                new Page<>(pageNum, pageSize), currentUserId, videoStatus,
+                StringUtils.isEmpty(title) ? null : title.trim());
+        // 填充播放跳转链接：优先最新审核通过剧集，无审核通过剧集时回退到最新剧集（作者预览待审核稿件）
+        result.getRecords().forEach(vo -> {
+            String episodeAvid = vo.getEpisodeAvid() != null ? vo.getEpisodeAvid() : vo.getLatestEpisodeAvid();
+            if (vo.getAvid() != null && episodeAvid != null) {
+                vo.setPlayLink("/client/video/" + vo.getAvid() + "/episode/" + episodeAvid);
+            }
+        });
+        return result;
     }
 
     @Override
@@ -661,6 +725,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         // 更新视频的总集数和总时长
         recalculateVideoStats(video.getId());
+        // 同步 ES 索引
+        refreshVideoEs(video.getId());
         return video;
     }
 
@@ -695,6 +761,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (dto.getEpisodes() != null) {
             syncEpisodes(existVideo, dto.getEpisodes());
         }
+        // 同步 ES 索引
+        refreshVideoEs(existVideo.getId());
     }
 
     @Override
@@ -721,6 +789,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         videoEpisodeMapper.delete(epWrapper);
         // 删除视频（标签随视频一并删除，无需单独处理）
         baseMapper.deleteById(video.getId());
+        // 删除 ES 索引文档
+        deleteVideoEs(video.getId());
     }
 
     @Override
@@ -737,6 +807,304 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
             throw new GlobeException("无权查看他人的投稿");
         }
         return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean toggleOngoing(String videoUid) {
+        if (StringUtils.isEmpty(videoUid)) {
+            throw new GlobeException("视频avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        Video video = baseMapper.selectOne(new LambdaQueryWrapper<Video>()
+                .eq(Video::getAvid, videoUid));
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        // 校验上传者身份：仅视频上传者可切换
+        if (!currentUserId.equals(video.getUserId())) {
+            throw new GlobeException("无权修改他人的视频");
+        }
+        // toggle：连载中→已完结，已完结→连载中
+        boolean newOngoing = !Boolean.TRUE.equals(video.getIsOngoing());
+        baseMapper.update(null, new LambdaUpdateWrapper<Video>()
+                .eq(Video::getId, video.getId())
+                .set(Video::getIsOngoing, newOngoing));
+        // 同步 ES 索引
+        refreshVideoEs(video.getId());
+        return newOngoing;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public VideoEpisode addEpisode(VideoEpisodeAddDto dto) {
+        if (StringUtils.isEmpty(dto.getVideoUid())) {
+            throw new GlobeException("视频avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        Video video = baseMapper.selectOne(new LambdaQueryWrapper<Video>()
+                .eq(Video::getAvid, dto.getVideoUid()));
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        // 校验上传者身份：仅视频上传者可添加剧集
+        if (!currentUserId.equals(video.getUserId())) {
+            throw new GlobeException("无权修改他人的视频");
+        }
+        // 仅连载中的视频可添加新剧集
+        if (!Boolean.TRUE.equals(video.getIsOngoing())) {
+            throw new GlobeException("已完结的视频不能添加新剧集");
+        }
+        // 集数序号与排序不传时自动追加到末尾（最大集数序号+1、最大排序+1）
+        List<VideoEpisode> episodes = videoEpisodeMapper.selectList(new LambdaQueryWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getVideoId, video.getId()));
+        int maxEpisodeNumber = episodes.stream()
+                .mapToInt(e -> e.getEpisodeNumber() != null ? e.getEpisodeNumber() : 0)
+                .max().orElse(0);
+        int maxSort = episodes.stream()
+                .mapToInt(e -> e.getSort() != null ? e.getSort() : -1)
+                .max().orElse(-1);
+        if (dto.getEpisodeNumber() == null) {
+            dto.setEpisodeNumber(maxEpisodeNumber + 1);
+        }
+        if (dto.getSort() == null) {
+            dto.setSort(maxSort + 1);
+        }
+        // 新增剧集（审核状态由免审配置决定，统计字段初始化为0）
+        VideoEpisode ep = buildNewEpisode(video.getId(), dto, 0, isAutoReviewEnabled());
+        videoEpisodeMapper.insert(ep);
+        // 更新视频的总集数和总时长
+        recalculateVideoStats(video.getId());
+        // 同步 ES 索引
+        refreshVideoEs(video.getId());
+        return ep;
+    }
+
+    @Override
+    public IPage<VideoEpisodeVo> pageMyEpisodes(EpisodePageDto dto) {
+        if (StringUtils.isEmpty(dto.getVideoUid())) {
+            throw new GlobeException("视频avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        Video video = baseMapper.selectOne(new LambdaQueryWrapper<Video>()
+                .eq(Video::getAvid, dto.getVideoUid()));
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        // 校验上传者身份：仅视频上传者可查询剧集
+        if (!currentUserId.equals(video.getUserId())) {
+            throw new GlobeException("无权查看他人的投稿");
+        }
+        int pageNum = dto.getPage() != null ? dto.getPage() : 1;
+        int pageSize = dto.getSize() != null ? dto.getSize() : 10;
+        // 多条件：标题模糊搜索 + 审核状态筛选，按排序与集数序号升序
+        LambdaQueryWrapper<VideoEpisode> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(VideoEpisode::getVideoId, video.getId());
+        if (StringUtils.isNotEmpty(dto.getTitle())) {
+            wrapper.like(VideoEpisode::getTitle, dto.getTitle().trim());
+        }
+        if (dto.getReviewStatus() != null) {
+            wrapper.eq(VideoEpisode::getReviewStatus, dto.getReviewStatus());
+        }
+        wrapper.orderByDesc(VideoEpisode::getSort, VideoEpisode::getEpisodeNumber);
+        IPage<VideoEpisode> pageResult = videoEpisodeMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        // 转换为VO并填充播放跳转链接
+        IPage<VideoEpisodeVo> result = new Page<>(pageNum, pageSize, pageResult.getTotal());
+        result.setRecords(pageResult.getRecords().stream().map(ep -> {
+            VideoEpisodeVo vo = new VideoEpisodeVo();
+            BeanUtils.copyProperties(ep, vo);
+            vo.setPlayLink("/client/video/" + video.getAvid() + "/episode/" + ep.getAvid());
+            return vo;
+        }).collect(Collectors.toList()));
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEpisode(EpisodeUpdateDto dto) {
+        if (StringUtils.isEmpty(dto.getEpisodeUid())) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        VideoEpisode episode = videoEpisodeMapper.selectOne(new LambdaQueryWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getAvid, dto.getEpisodeUid()));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+        Video video = baseMapper.selectById(episode.getVideoId());
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        // 校验上传者身份：仅视频上传者可编辑剧集
+        if (!currentUserId.equals(video.getUserId())) {
+            throw new GlobeException("无权修改他人的视频");
+        }
+        // 标题或播放地址变更时重置审核状态为待审核（与投稿编辑同步逻辑一致）
+        Integer reviewStatus = episode.getReviewStatus();
+        if (!episode.equalsObj(dto.getTitle(), dto.getPlayUrl())) {
+            reviewStatus = VideoConstant.REVIEW_PENDING;
+        }
+        // 显式 set 逐字段更新，允许标题与播放地址置空；集数序号与排序不传时保持原值
+        videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getId, episode.getId())
+                .set(dto.getEpisodeNumber() != null, VideoEpisode::getEpisodeNumber, dto.getEpisodeNumber())
+                .set(VideoEpisode::getTitle, dto.getTitle())
+                .set(VideoEpisode::getDuration, dto.getDuration())
+                .set(VideoEpisode::getPlayUrl, dto.getPlayUrl())
+                .set(dto.getSort() != null, VideoEpisode::getSort, dto.getSort())
+                .set(VideoEpisode::getReviewStatus, reviewStatus));
+        // 时长可能变化，重算视频的总集数和总时长
+        recalculateVideoStats(video.getId());
+        // 同步 ES 索引（标题/时长/审核状态变更影响搜索展示）
+        refreshVideoEs(video.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteEpisodeByUid(String episodeUid) {
+        if (StringUtils.isEmpty(episodeUid)) {
+            throw new GlobeException("剧集avid不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        VideoEpisode episode = videoEpisodeMapper.selectOne(new LambdaQueryWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getAvid, episodeUid));
+        if (episode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+        Video video = baseMapper.selectById(episode.getVideoId());
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        // 校验上传者身份：仅视频上传者可删除剧集
+        if (!currentUserId.equals(video.getUserId())) {
+            throw new GlobeException("无权修改他人的视频");
+        }
+        // 仅连载中的视频可删除剧集（与添加剧集对称）
+        if (!Boolean.TRUE.equals(video.getIsOngoing())) {
+            throw new GlobeException("已完结的视频不能删除剧集");
+        }
+        videoEpisodeMapper.deleteById(episode.getId());
+        // 重算视频的总集数和总时长
+        recalculateVideoStats(video.getId());
+        // 同步 ES 索引
+        refreshVideoEs(video.getId());
+    }
+
+    @Override
+    public DataCenterVo getDataCenter() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        // 总量统计：自己所有投稿剧集的观看/收藏/投币/点赞累计（无投稿时置0）
+        DataCenterVo vo = baseMapper.selectDataCenterStats(currentUserId);
+        if (vo == null) {
+            vo = new DataCenterVo();
+            vo.setTotalPlayCount(0L);
+            vo.setTotalFavoriteCount(0L);
+            vo.setTotalCoinCount(0L);
+            vo.setTotalLikeCount(0L);
+        }
+        // 榜单：最热视频TOP5（观看数最多）与最受欢迎视频TOP5（收藏数最多），填充播放跳转链接
+        List<ClientVideoVo> hotVideos = baseMapper.selectHotVideos(currentUserId, BaseConstant.DATA_CENTER_TOP_SIZE);
+        List<ClientVideoVo> favoriteVideos = baseMapper.selectFavoriteVideos(currentUserId, BaseConstant.DATA_CENTER_TOP_SIZE);
+        fillPlayLink(hotVideos);
+        fillPlayLink(favoriteVideos);
+        vo.setHotVideos(hotVideos);
+        vo.setFavoriteVideos(favoriteVideos);
+        return vo;
+    }
+
+    /**
+     * 聚合搜索视频排序类型 → ORDER BY 列 映射（latest:按发布时间 hot:按播放量 favorite:按收藏数）
+     */
+    private static final Map<String, String> SEARCH_SORT_COLUMN_MAP = Map.of(
+            VideoConstant.SORT_LATEST, "v.create_time",
+            VideoConstant.SORT_HOT, "play_count",
+            VideoConstant.SORT_FAVORITE, "favorite_count"
+    );
+
+    @Override
+    public IPage<ClientVideoVo> pageSearchVideo(String keyword, Integer page, Integer size, String sortType) {
+        // ES 已装配且 web_config 开关开启：走 Elasticsearch，异常自动降级数据库查询
+        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
+        if (esSearchService != null && isEsSearchEnabled()) {
+            try {
+                IPage<ClientVideoVo> result = esSearchService.searchVideo(keyword, page, size, sortType);
+                fillPlayLink(result.getRecords());
+                fillFollowStatus(result.getRecords());
+                return result;
+            } catch (Exception e) {
+                log.warn("ES 视频搜索失败，降级为数据库查询: {}", e.getMessage());
+            }
+        }
+        int pageNum = page != null ? page : 1;
+        int pageSize = size != null ? size : 10;
+        // 排序白名单解析：非法值降级为最新排序
+        String key = sortType == null || sortType.isBlank()
+                ? VideoConstant.SORT_LATEST
+                : sortType.trim().toLowerCase();
+        String orderColumn = SEARCH_SORT_COLUMN_MAP.getOrDefault(key, SEARCH_SORT_COLUMN_MAP.get(VideoConstant.SORT_LATEST));
+        String trimKeyword = StringUtils.isNotEmpty(keyword) ? keyword.trim() : null;
+        IPage<ClientVideoVo> result = baseMapper.selectSearchVideoPage(new Page<>(pageNum, pageSize), trimKeyword, orderColumn);
+        // 填充播放跳转链接与关注标记
+        fillPlayLink(result.getRecords());
+        fillFollowStatus(result.getRecords());
+        return result;
+    }
+
+    /**
+     * 聚合搜索是否走 Elasticsearch（web_config 中 search/es_search 配置，Redis缓存优先）
+     */
+    private boolean isEsSearchEnabled() {
+        String value = webConfigService.getConfigValue(
+                BaseConstant.WEB_CONFIG_CATEGORY_SEARCH, BaseConstant.WEB_CONFIG_KEY_ES_SEARCH);
+        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(value);
+    }
+
+    /**
+     * 视频变更后同步 ES 索引（ES 未装配或同步失败时静默忽略，不影响主流程）
+     */
+    private void refreshVideoEs(Long videoId) {
+        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
+        if (esSearchService == null) {
+            return;
+        }
+        try {
+            esSearchService.refreshVideo(videoId);
+        } catch (Exception e) {
+            log.warn("同步视频到 ES 失败 videoId={}: {}", videoId, e.getMessage());
+        }
+    }
+
+    /**
+     * 删除视频 ES 索引文档（ES 未装配或删除失败时静默忽略，不影响主流程）
+     */
+    private void deleteVideoEs(Long videoId) {
+        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
+        if (esSearchService == null) {
+            return;
+        }
+        try {
+            esSearchService.deleteVideo(videoId);
+        } catch (Exception e) {
+            log.warn("删除 ES 视频文档失败 videoId={}: {}", videoId, e.getMessage());
+        }
     }
 
     // ==================== 私有方法 ====================

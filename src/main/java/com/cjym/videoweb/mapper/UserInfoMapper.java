@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.model.dto.UserDto;
 import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserStatsVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -67,4 +68,11 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
      * 用户统计总览：总数/大会员/管理员 + 今日/昨日新增 + 今日/昨日活跃
      */
     UserStatsVo selectUserStats();
+
+    /**
+     * 聚合搜索UP主分页：模糊匹配昵称或uid（keyword 不传返回全部），含关注数/粉丝数/累计获赞/累计播放，按排序白名单列倒序
+     */
+    IPage<UpUserVo> selectSearchUpPage(Page<UpUserVo> page,
+                                       @Param("keyword") String keyword,
+                                       @Param("orderColumn") String orderColumn);
 }

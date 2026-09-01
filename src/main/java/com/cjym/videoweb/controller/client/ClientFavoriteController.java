@@ -49,7 +49,7 @@ public class ClientFavoriteController {
      * @param dto 收藏请求体，episodeUid 必填，folderUid 可选（缺省为默认收藏夹）
      */
     @PostMapping("/add")
-    @Operation(summary = "收藏到文件夹", description = "收藏剧集到指定收藏夹：folderUid不传时收藏到默认收藏夹；同一剧集可收藏到多个不同收藏夹")
+    @Operation(summary = "收藏到文件夹", description = "收藏剧集到指定收藏夹：folderUid不传时收藏到默认收藏夹；同一剧集可收藏到多个不同收藏夹；剧集未审核通过时不允许收藏")
     public R<String> add(@RequestBody FavoriteAddDto dto) {
         favoriteService.add(dto);
         return R.success("收藏成功");

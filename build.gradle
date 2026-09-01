@@ -51,6 +51,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.apache.commons:commons-pool2'
 
+    // Elasticsearch 聚合搜索 (Java API Client，版本由 Spring Boot BOM 管理)
+    implementation 'co.elastic.clients:elasticsearch-java'
+
     // MyBatis-Plus ORM (Spring Boot 3.x)
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter:3.5.10.1'
     // MyBatis-Plus 分页插件 JSqlParser 支持

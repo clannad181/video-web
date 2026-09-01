@@ -1,7 +1,10 @@
 package com.cjym.videoweb.model.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 @Data
 @Schema(description = "剧集信息")
@@ -48,6 +51,10 @@ public class VideoEpisodeVo {
 
     @Schema(description = "观看人数")
     private Long viewerCount;
+
+    @Schema(description = "创建时间")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createTime;
 
     @Schema(description = "播放跳转链接（如 /client/video/avXxx/episode/avYyy）")
     private String playLink;

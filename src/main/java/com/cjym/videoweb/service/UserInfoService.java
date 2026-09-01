@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.ClientUserUpdateDto;
 import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.vo.ClientUserVo;
+import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.UserVo;
@@ -95,4 +96,9 @@ public interface UserInfoService extends IService<UserInfo> {
      * 用户统计总览：总数/大会员/管理员 + 今日/昨日新增 + 今日/昨日活跃
      */
     UserStatsVo getUserStats();
+
+    /**
+     * 聚合搜索UP主分页：模糊匹配昵称或uid（keyword 不传返回全部），含UP主完整公开信息，按排序白名单列倒序
+     */
+    IPage<UpUserVo> pageSearchUp(String keyword, Integer page, Integer size, String sortType);
 }
