@@ -132,6 +132,37 @@
         ORDER BY ${orderColumn} DESC
     </select>
 
+    <!-- 聚合搜索视频分页：标题模糊搜索（仅已发布且至少有一集审核通过），按排序白名单列倒序 -->
+    <select id="selectSearchVideoPage" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+        <if test="keyword != null and keyword != ''">
+          AND v.title LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        <choose>
+            <when test="orderColumn != null and orderColumn != ''">
+                ORDER BY ${orderColumn} DESC
+            </when>
+            <otherwise>
+                ORDER BY v.create_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
     <!-- 相关视频推荐第一步：候选视频id列表（简单SQL，无聚合无复杂排序） -->
     <select id="selectRelatedVideoIds" resultType="long">
         SELECT v.id
@@ -235,32 +266,60 @@
     </select>
 
     <resultMap id="MyContributionVideoResultMap" type="com.cjym.videoweb.model.vo.MyContributionVideoVo">
-        <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="avid" property="avid" jdbcType="VARCHAR"/>
         <result column="title" property="title" jdbcType="VARCHAR"/>
         <result column="cover_url" property="coverUrl" jdbcType="VARCHAR"/>
         <result column="video_status" property="videoStatus" jdbcType="INTEGER"/>
+        <result column="is_ongoing" property="isOngoing" jdbcType="BOOLEAN"/>
         <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
         <result column="play_count" property="playCount" jdbcType="BIGINT"/>
         <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
         <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
+        <result column="latest_episode_avid" property="latestEpisodeAvid" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
     <!-- 我的投稿：按用户与时间范围查询视频（含播放/收藏聚合与最新审核通过剧集avid），按投稿时间倒序 -->
     <select id="selectMyContributions" resultMap="MyContributionVideoResultMap">
-        SELECT v.id, v.avid, v.title, v.cover_url, v.video_status, v.episode_count,
+        SELECT v.id, v.avid, v.title, v.cover_url, v.video_status, v.is_ongoing, v.episode_count,
                COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
                COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
                (SELECT e.avid FROM public.video_episode e
                 WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
                 ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0
+                ORDER BY e.episode_number DESC LIMIT 1) AS latest_episode_avid,
                v.create_time
         FROM public.video_info v
         WHERE v.is_delete = 0
           AND v.user_id = #{userId}
           AND v.create_time &gt;= #{startTime}
           AND v.create_time &lt; #{endTime}
+        ORDER BY v.create_time DESC
+    </select>
+
+    <!-- 我的投稿分页：按用户分页查询投稿（全部状态，可选状态与标题筛选），按投稿时间倒序 -->
+    <select id="selectMyContributionsPage" resultMap="MyContributionVideoResultMap">
+        SELECT v.avid, v.title, v.cover_url, v.video_status, v.is_ongoing, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0
+                ORDER BY e.episode_number DESC LIMIT 1) AS latest_episode_avid,
+               v.create_time
+        FROM public.video_info v
+        WHERE v.is_delete = 0
+          AND v.user_id = #{userId}
+        <if test="videoStatus != null">
+          AND v.video_status = #{videoStatus}
+        </if>
+        <if test="title != null and title != ''">
+          AND v.title LIKE CONCAT('%', #{title}, '%')
+        </if>
         ORDER BY v.create_time DESC
     </select>
 
@@ -271,6 +330,65 @@
         FROM public.video_info v
         INNER JOIN public.video_episode e ON e.video_id = v.id AND e.is_delete = 0
         WHERE v.user_id = #{userId} AND v.is_delete = 0
+    </select>
+
+    <!-- ==================== 前台个人数据中心 ==================== -->
+
+    <!-- 个人数据中心总量统计：自己所有投稿剧集的观看/收藏/投币/点赞累计 -->
+    <select id="selectDataCenterStats" resultType="com.cjym.videoweb.model.vo.DataCenterVo">
+        SELECT COALESCE(SUM(e.play_count), 0) AS total_play_count,
+               COALESCE(SUM(e.favorite_count), 0) AS total_favorite_count,
+               COALESCE(SUM(e.coin_count), 0) AS total_coin_count,
+               COALESCE(SUM(e.like_count), 0) AS total_like_count
+        FROM public.video_info v
+        INNER JOIN public.video_episode e ON e.video_id = v.id AND e.is_delete = 0
+        WHERE v.user_id = #{userId} AND v.is_delete = 0
+    </select>
+
+    <!-- 个人数据中心最热视频TOP N：自己投稿按播放数倒序（最新剧集avid优先审核通过，无则回退最新剧集供作者预览） -->
+    <select id="selectHotVideos" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               COALESCE((SELECT e.avid FROM public.video_episode e
+                         WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                         ORDER BY e.episode_number DESC LIMIT 1),
+                        (SELECT e.avid FROM public.video_episode e
+                         WHERE e.video_id = v.id AND e.is_delete = 0
+                         ORDER BY e.episode_number DESC LIMIT 1)) AS episode_avid,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.user_id = #{userId}
+        ORDER BY play_count DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 个人数据中心最受欢迎视频TOP N：自己投稿按收藏数倒序（最新剧集avid优先审核通过，无则回退最新剧集供作者预览） -->
+    <select id="selectFavoriteVideos" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               COALESCE((SELECT e.avid FROM public.video_episode e
+                         WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                         ORDER BY e.episode_number DESC LIMIT 1),
+                        (SELECT e.avid FROM public.video_episode e
+                         WHERE e.video_id = v.id AND e.is_delete = 0
+                         ORDER BY e.episode_number DESC LIMIT 1)) AS episode_avid,
+               v.is_ongoing, v.create_time, v.user_id,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.user_id = #{userId}
+        ORDER BY favorite_count DESC
+        LIMIT #{limit}
     </select>
 
     <resultMap id="VideoDetailResultMap" type="com.cjym.videoweb.model.vo.VideoVo">

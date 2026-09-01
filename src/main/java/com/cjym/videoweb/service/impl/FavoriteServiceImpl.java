@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cjym.videoweb.constant.FavoriteConstant;
+import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.EpisodeFavoriteMapper;
 import com.cjym.videoweb.mapper.FavoriteFolderMapper;
@@ -77,6 +78,10 @@ public class FavoriteServiceImpl implements FavoriteService {
                 new LambdaQueryWrapper<VideoEpisode>().eq(VideoEpisode::getAvid, dto.getEpisodeUid()));
         if (episode == null) {
             throw new GlobeException("剧集不存在");
+        }
+        // 剧集未审核通过时不允许收藏
+        if (episode.getReviewStatus() == null || episode.getReviewStatus() != VideoConstant.REVIEW_APPROVED) {
+            throw new GlobeException("剧集未审核通过，无法收藏");
         }
         // 解析目标收藏夹
         FavoriteFolder folder = favoriteFolderService.resolveTarget(currentUserId, dto.getFolderUid());

@@ -68,6 +68,11 @@ public class BaseConstant {
      */
     public static final Integer RECENT_ACTION_LIMIT = 20;
 
+    /**
+     * 前台个人数据中心榜单数量上限（最热/最受欢迎视频TOP数）
+     */
+    public static final Integer DATA_CENTER_TOP_SIZE = 5;
+
     // ==================== Token 有效期配置 key（存放在 web_config 表） ====================
     /** 前台 Access Token 有效期配置键 */
     public static final String FRONT_ACCESS_TOKEN_EXPIRY = "front_access_token_expiry";
@@ -89,12 +94,16 @@ public class BaseConstant {
     public static final String WEB_CONFIG_CATEGORY_REVIEW = "review";
     /** WebConfig display 分类 */
     public static final String WEB_CONFIG_CATEGORY_DISPLAY = "display";
+    /** WebConfig search 分类 */
+    public static final String WEB_CONFIG_CATEGORY_SEARCH = "search";
     /** WebConfig 默认角色配置键 */
     public static final String WEB_CONFIG_KEY_DEFAULT_ROLE = "default_role";
     /** WebConfig 视频免审配置键 */
     public static final String WEB_CONFIG_KEY_VIDEO_REVIEW = "video_review";
     /** WebConfig 评论免审配置键 */
     public static final String WEB_CONFIG_KEY_COMMENT_REVIEW = "comment_review";
+    /** WebConfig 聚合搜索是否走 Elasticsearch 配置键 */
+    public static final String WEB_CONFIG_KEY_ES_SEARCH = "es_search";
 
     // ==================== WebConfig 通用值常量 ====================
     /** WebConfig 布尔真值 */

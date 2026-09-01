@@ -10,9 +10,6 @@ import java.time.LocalDateTime;
 @Schema(description = "我的投稿视频记录")
 public class MyContributionVideoVo {
 
-    @Schema(description = "视频id")
-    private Long id;
-
     @Schema(description = "视频avid")
     private String avid;
 
@@ -24,6 +21,9 @@ public class MyContributionVideoVo {
 
     @Schema(description = "视频状态：0-草稿，1-待发布，2-已发布，3-已下架")
     private Integer videoStatus;
+
+    @Schema(description = "是否连载中")
+    private Boolean isOngoing;
 
     @Schema(description = "总集数")
     private Integer episodeCount;
@@ -37,7 +37,10 @@ public class MyContributionVideoVo {
     @Schema(description = "最新更新剧集avid（审核通过剧集中集数序号最大的一集）")
     private String episodeAvid;
 
-    @Schema(description = "播放跳转链接（如 /client/video/avXxx/episode/avYyy），无审核通过剧集时为空")
+    @Schema(description = "最新剧集avid（不限审核状态，用于待审核稿件的预览跳转）")
+    private String latestEpisodeAvid;
+
+    @Schema(description = "播放跳转链接（如 /client/video/avXxx/episode/avYyy）：优先最新审核通过剧集，无审核通过剧集时回退到最新剧集（作者预览）")
     private String playLink;
 
     @Schema(description = "投稿时间")

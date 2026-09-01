@@ -174,4 +174,55 @@
             (SELECT COUNT(DISTINCT user_id) FROM public.operation_log WHERE is_delete = 0 AND operation_time::date = CURRENT_DATE - 1) AS yesterday_active_count
     </select>
 
+    <!-- ==================== 聚合搜索UP主 ==================== -->
+
+    <resultMap id="UpUserResultMap" type="com.cjym.videoweb.model.vo.UpUserVo">
+        <result column="uid" property="uid" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nikeName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
+        <result column="descript" property="descript" jdbcType="VARCHAR"/>
+        <result column="sex" property="sex" jdbcType="BOOLEAN"/>
+        <result column="is_vip" property="isVip" jdbcType="BOOLEAN"/>
+        <result column="follow_count" property="followCount" jdbcType="BIGINT"/>
+        <result column="fans_count" property="fansCount" jdbcType="BIGINT"/>
+        <result column="total_like_count" property="totalLikeCount" jdbcType="BIGINT"/>
+        <result column="total_play_count" property="totalPlayCount" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <!-- 聚合搜索UP主分页：模糊匹配昵称或uid（keyword 不传返回全部），含关注数/粉丝数/累计获赞/累计播放，按排序白名单列倒序 -->
+    <select id="selectSearchUpPage" resultMap="UpUserResultMap">
+        SELECT u.uid,
+               u.nike_name,
+               u.avatar,
+               u.descript,
+               u.sex,
+               u.is_vip,
+               (SELECT COUNT(*) FROM public.user_follow f1
+                WHERE f1.user_id = u.id AND f1.is_delete = 0) AS follow_count,
+               (SELECT COUNT(*) FROM public.user_follow f1
+                WHERE f1.follow_user_id = u.id AND f1.is_delete = 0) AS fans_count,
+               (SELECT COALESCE(SUM(ue.like_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS total_like_count,
+               (SELECT COALESCE(SUM(ue.play_count), 0)
+                FROM public.video_info uv
+                INNER JOIN public.video_episode ue ON ue.video_id = uv.id AND ue.is_delete = 0
+                WHERE uv.user_id = u.id AND uv.is_delete = 0) AS total_play_count
+        FROM public.user_info u
+        WHERE u.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+          AND (u.nike_name LIKE CONCAT('%', #{keyword}, '%')
+               OR u.uid LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <choose>
+            <when test="orderColumn != null and orderColumn != ''">
+                ORDER BY ${orderColumn} DESC
+            </when>
+            <otherwise>
+                ORDER BY fans_count DESC
+            </otherwise>
+        </choose>
+    </select>
+
 </mapper>

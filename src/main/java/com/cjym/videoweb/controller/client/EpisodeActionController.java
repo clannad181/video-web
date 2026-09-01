@@ -35,7 +35,7 @@ public class EpisodeActionController {
      * @param episodeUid 剧集avid
      */
     @PostMapping("/{episodeUid}/like")
-    @Operation(summary = "点赞/取消点赞", description = "toggle逻辑：已点赞则取消，未点赞则点赞；返回最新点赞数和当前用户点赞状态")
+    @Operation(summary = "点赞/取消点赞", description = "toggle逻辑：已点赞则取消，未点赞则点赞；返回最新点赞数和当前用户点赞状态；剧集未审核通过时不允许操作")
     public R<EpisodeActionVo> like(
             @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
         return R.success(episodeActionService.toggleLike(episodeUid));
@@ -47,7 +47,7 @@ public class EpisodeActionController {
      * @param episodeUid 剧集avid
      */
     @PostMapping("/{episodeUid}/coin")
-    @Operation(summary = "投币", description = "每个用户每集只能投币一次，不可取消；返回最新投币数和当前用户投币状态")
+    @Operation(summary = "投币", description = "每个用户每集只能投币一次，不可取消；返回最新投币数和当前用户投币状态；剧集未审核通过时不允许投币")
     public R<EpisodeActionVo> coin(
             @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
         return R.success(episodeActionService.coin(episodeUid));

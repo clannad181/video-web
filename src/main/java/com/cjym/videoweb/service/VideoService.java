@@ -2,15 +2,21 @@ package com.cjym.videoweb.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.cjym.videoweb.model.dto.EpisodePageDto;
+import com.cjym.videoweb.model.dto.EpisodeUpdateDto;
 import com.cjym.videoweb.model.dto.VideoContributeDto;
+import com.cjym.videoweb.model.dto.VideoEpisodeAddDto;
 import com.cjym.videoweb.model.dto.VideoEpisodeSaveBatchDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Video;
+import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
+import com.cjym.videoweb.model.vo.DataCenterVo;
 import com.cjym.videoweb.model.vo.MonthlyContributionVo;
+import com.cjym.videoweb.model.vo.MyContributionVideoVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -122,6 +128,11 @@ public interface VideoService extends IService<Video> {
     List<MonthlyContributionVo> listMyContributions(LocalDate startDate, LocalDate endDate);
 
     /**
+     * 我的投稿分页：分页查询当前登录用户的投稿（全部状态，可选按状态与标题筛选），按投稿时间倒序
+     */
+    IPage<MyContributionVideoVo> pageMyContributions(Integer page, Integer size, Integer videoStatus, String title);
+
+    /**
      * 用户端投稿视频（身份从token解析，审核流程跟随免审配置：免审关闭时自动发布，开启时进入待发布待审核）
      */
     Video contribute(VideoContributeDto dto);
@@ -140,4 +151,39 @@ public interface VideoService extends IService<Video> {
      * 用户端投稿详情（按avid查询自己的视频，含剧集和标签，供编辑回显）
      */
     VideoVo getContributionDetail(String videoUid);
+
+    /**
+     * 用户端快速切换连载状态（按avid定位自己的视频，自动取反isOngoing，仅上传者可操作，返回切换后的连载状态）
+     */
+    Boolean toggleOngoing(String videoUid);
+
+    /**
+     * 用户端连载中视频添加剧集（按avid定位自己的视频，仅连载中可添加，集数序号与排序不传时自动追加到末尾，审核流程跟随免审配置）
+     */
+    VideoEpisode addEpisode(VideoEpisodeAddDto dto);
+
+    /**
+     * 用户端剧集分页查询（按视频avid定位自己的视频，支持标题模糊搜索与审核状态筛选，按排序与集数序号升序，含播放跳转链接）
+     */
+    IPage<VideoEpisodeVo> pageMyEpisodes(EpisodePageDto dto);
+
+    /**
+     * 用户端编辑剧集（按剧集avid定位自己的视频剧集，标题或播放地址变更时重置审核状态，级联重算视频统计）
+     */
+    void updateEpisode(EpisodeUpdateDto dto);
+
+    /**
+     * 用户端删除剧集（按剧集avid定位自己的视频剧集，仅连载中视频可删除，级联重算视频统计）
+     */
+    void deleteEpisodeByUid(String episodeUid);
+
+    /**
+     * 前台个人数据中心：自己所有投稿的观看/收藏/投币/点赞累计 + 最热视频TOP5（观看数最多）+ 最受欢迎视频TOP5（收藏数最多）
+     */
+    DataCenterVo getDataCenter();
+
+    /**
+     * 聚合搜索视频分页：标题模糊搜索（keyword 不传返回全部，仅已发布且至少一集审核通过），按排序白名单列倒序，含播放跳转链接与关注标记
+     */
+    IPage<ClientVideoVo> pageSearchVideo(String keyword, Integer page, Integer size, String sortType);
 }
