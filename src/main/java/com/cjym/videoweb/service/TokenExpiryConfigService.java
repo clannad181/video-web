@@ -1,28 +1,25 @@
 package com.cjym.videoweb.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cjym.videoweb.constant.BaseConstant;
-import com.cjym.videoweb.mapper.WebConfigMapper;
-import com.cjym.videoweb.model.entity.WebConfig;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
  * Token 有效期配置服务
  * <p>
- * 从 web_config 表读取 token 有效期并缓存到 Redis，支持前台/后台各自配置：
+ * 从 web_config 表 token_expiry 分类读取 token 有效期，支持前台/后台各自配置：
  * front_access_token_expiry  /  front_refresh_token_expiry
  * backend_access_token_expiry / backend_refresh_token_expiry
+ * <p>
+ * 缓存策略复用 {@link WebConfigService#getConfigValue}（Redis 缓存优先、回源数据库降级），
+ * 配置修改后由 WebConfigService 统一失效缓存，无需独立维护缓存 key。
  */
 @Service
 @Slf4j
 public class TokenExpiryConfigService {
-
-    private static final String REDIS_KEY_PREFIX = "token_expiry:";
 
     /** 默认 access token 有效期：15 分钟 */
     private static final long DEFAULT_ACCESS_EXPIRY = 900_000L;
@@ -32,16 +29,13 @@ public class TokenExpiryConfigService {
     public static final long MAX_REFRESH_WINDOW = 2_592_000_000L;
 
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private WebConfigMapper webConfigMapper;
+    private WebConfigService webConfigService;
 
     /**
-     * 启动时预热4个配置到 Redis
+     * 启动时校验 4 个配置项是否存在，缺失时告警提示（运行期不再重复输出日志）
      */
     @PostConstruct
-    public void initCache() {
+    public void initCheck() {
         String[] keys = {
                 BaseConstant.FRONT_ACCESS_TOKEN_EXPIRY,
                 BaseConstant.FRONT_REFRESH_TOKEN_EXPIRY,
@@ -49,9 +43,11 @@ public class TokenExpiryConfigService {
                 BaseConstant.BACKEND_REFRESH_TOKEN_EXPIRY
         };
         for (String key : keys) {
-            getExpiryFromSource(key);
+            if (StringUtils.isEmpty(webConfigService.getConfigValue(
+                    BaseConstant.WEB_CONFIG_CATEGORY_TOKEN_EXPIRY, key))) {
+                log.warn("Token有效期配置缺失[key={}]，将使用默认值，可执行 db/init_token_expiry.sql 初始化", key);
+            }
         }
-        log.info("Token有效期配置已加载到Redis");
     }
 
     /**
@@ -79,41 +75,23 @@ public class TokenExpiryConfigService {
     }
 
     /**
-     * 从 Redis → DB 逐级读取配置值（含缓存回填）
+     * 读取 token 有效期配置（统一走 WebConfigService：Redis 缓存优先，未命中回源数据库）
+     *
+     * @param configKey     web_config 表中的配置键
+     * @param defaultMillis 配置不存在或格式错误时的默认值
      */
     private long getExpiry(String configKey, long defaultMillis) {
-        // 1. Redis 缓存
-        String redisValue = stringRedisTemplate.opsForValue().get(REDIS_KEY_PREFIX + configKey);
-        if (StringUtils.isNotEmpty(redisValue)) {
-            try {
-                return Long.parseLong(redisValue);
-            } catch (NumberFormatException e) {
-                log.warn("Token有效期Redis值格式错误[key={},value={}]", configKey, redisValue);
-            }
+        String value = webConfigService.getConfigValue(BaseConstant.WEB_CONFIG_CATEGORY_TOKEN_EXPIRY, configKey);
+        if (StringUtils.isEmpty(value)) {
+            // 缺失提示已在启动时 warn 过，运行期降为 debug 避免刷屏
+            log.debug("Token有效期配置不存在[key={}]，使用默认值{}ms", configKey, defaultMillis);
+            return defaultMillis;
         }
-        // 2. 回源 DB 并写入 Redis
-        return getExpiryFromSource(configKey, defaultMillis);
-    }
-
-    private long getExpiryFromSource(String configKey) {
-        return getExpiryFromSource(configKey, DEFAULT_ACCESS_EXPIRY);
-    }
-
-    private long getExpiryFromSource(String configKey, long defaultMillis) {
-        LambdaQueryWrapper<WebConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(WebConfig::getKey, configKey);
-        WebConfig config = webConfigMapper.selectOne(wrapper);
-        long expiry = defaultMillis;
-        if (config != null && StringUtils.isNotEmpty(config.getValue())) {
-            try {
-                expiry = Long.parseLong(config.getValue());
-            } catch (NumberFormatException e) {
-                log.warn("Token有效期DB值格式错误[key={},value={}]，使用默认值", configKey, config.getValue());
-            }
-        } else {
-            log.info("Token有效期配置不存在[key={}]，使用默认值{}ms", configKey, defaultMillis);
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            log.warn("Token有效期配置值格式错误[key={},value={}]，使用默认值{}ms", configKey, value, defaultMillis);
+            return defaultMillis;
         }
-        stringRedisTemplate.opsForValue().set(REDIS_KEY_PREFIX + configKey, String.valueOf(expiry));
-        return expiry;
     }
 }

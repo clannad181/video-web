@@ -96,6 +96,8 @@ public class BaseConstant {
     public static final String WEB_CONFIG_CATEGORY_DISPLAY = "display";
     /** WebConfig search 分类 */
     public static final String WEB_CONFIG_CATEGORY_SEARCH = "search";
+    /** WebConfig token 有效期分类 */
+    public static final String WEB_CONFIG_CATEGORY_TOKEN_EXPIRY = "token_security";
     /** WebConfig 默认角色配置键 */
     public static final String WEB_CONFIG_KEY_DEFAULT_ROLE = "default_role";
     /** WebConfig 视频免审配置键 */

@@ -27,4 +27,13 @@ public interface WebConfigService extends IService<WebConfig> {
      * @return 配置值，未找到返回null
      */
     String getConfigValue(String category, String key);
+
+    /**
+     * 根据分类和键查询布尔配置值（Redis缓存优先，未命中回源数据库）
+     * 仅当配置值为 "true"（忽略大小写）时返回 true，其余情况（含配置不存在）返回 false
+     *
+     * @param category 配置分类
+     * @param key      配置键
+     */
+    boolean getConfigBoolean(String category, String key);
 }

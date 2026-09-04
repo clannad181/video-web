@@ -2,6 +2,7 @@ package com.cjym.videoweb.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.mapper.WebConfigMapper;
 import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.WebConfigVo;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
@@ -74,7 +76,10 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
             try {
                 List<WebConfigVo> voList = objectMapper.readValue(cached,
                         new TypeReference<List<WebConfigVo>>() {});
-                return R.success(voList);
+                if (!voList.isEmpty()) {
+                    return R.success(voList);
+                }
+                // 缓存为空列表时继续回源数据库，避免空列表永久缓存导致新增配置不可见
             } catch (JsonProcessingException e) {
                 // 缓存数据异常，回源数据库
             }
@@ -83,10 +88,12 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
         // 2. Redis 未命中，查数据库
         List<WebConfigVo> voList = loadConfigListFromDb(category);
 
-        // 3. 写入 Redis 缓存
-        try {
-            stringRedisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(voList));
-        } catch (JsonProcessingException ignored) {
+        // 3. 仅当有数据时回写缓存（空列表不缓存）
+        if (!voList.isEmpty()) {
+            try {
+                stringRedisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(voList));
+            } catch (JsonProcessingException ignored) {
+            }
         }
 
         return R.success(voList);
@@ -123,17 +130,23 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
             try {
                 configList = objectMapper.readValue(cached,
                         new TypeReference<List<WebConfigVo>>() {});
+                if (configList.isEmpty()) {
+                    // 缓存为空列表视为未命中，回源数据库（自愈残留空缓存）
+                    configList = null;
+                }
             } catch (JsonProcessingException ignored) {
                 // 缓存数据异常，回源数据库
             }
         }
 
-        // 2. Redis 未命中或解析失败，回源数据库并回写缓存
+        // 2. Redis 未命中或解析失败，回源数据库并回写缓存（空列表不缓存）
         if (configList == null) {
             configList = loadConfigListFromDb(category);
-            try {
-                stringRedisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(configList));
-            } catch (JsonProcessingException ignored) {
+            if (!configList.isEmpty()) {
+                try {
+                    stringRedisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(configList));
+                } catch (JsonProcessingException ignored) {
+                }
             }
         }
 
@@ -147,6 +160,12 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
     }
 
     @Override
+    public boolean getConfigBoolean(String category, String key) {
+        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(getConfigValue(category, key));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public R<String> update(List<WebConfigVo> configList) {
         if (configList == null || configList.isEmpty()) {
             return R.error("配置列表不能为空");

@@ -10,7 +10,6 @@ import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
-import com.cjym.videoweb.mapper.WebConfigMapper;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.model.dto.EpisodePageDto;
@@ -25,7 +24,6 @@ import com.cjym.videoweb.model.entity.Follow;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.entity.UserInfo;
-import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.CategorySimpleVo;
 import com.cjym.videoweb.model.vo.CategoryStatsVo;
 import com.cjym.videoweb.model.vo.ClientVideoDetailVo;
@@ -37,26 +35,22 @@ import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
 import com.cjym.videoweb.model.vo.VideoVo;
-import com.cjym.videoweb.model.vo.WebConfigVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CategoryService;
 import com.cjym.videoweb.service.CommentService;
 import com.cjym.videoweb.service.EsSearchService;
 import com.cjym.videoweb.service.VideoService;
 import com.cjym.videoweb.service.WatchHistoryService;
+import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.Base62Converter;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.SnowflakeIdGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -84,16 +78,10 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     private VideoEpisodeMapper videoEpisodeMapper;
 
     @Resource
-    private WebConfigMapper webConfigMapper;
+    private WebConfigService webConfigService;
 
     @Resource
     private CategoryService categoryService;
-
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private ObjectMapper objectMapper;
 
     @Resource
     private SnowflakeIdGenerator snowflakeIdGenerator;
@@ -414,7 +402,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         long snowflakeId = snowflakeIdGenerator.nextId();
         video.setAvid(Base62Converter.toAvid(snowflakeId));
         video.setTags(tagsToStr(dto.getTags()));
-        // 读取 web_config 中 video_review 配置，若为 true（免审开启）则自动发布并审核通过
+        // 读取 web_config 中 video_review 配置：为 true 时投稿进入待审核，否则直接发布
         boolean autoReview = isAutoReviewEnabled();
         if (!autoReview) {
             video.setVideoStatus(2);  // 已发布
@@ -1199,33 +1187,12 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     }
 
     /**
-     * 读取 web_config 中 video_review 配置（优先 Redis 缓存，未命中查库）
-     * @return true 表示开启免审自动发布
+     * 读取 web_config 中 video_review 配置（统一走 WebConfigService：Redis 缓存优先，未命中回源数据库）
+     * @return true 表示开启审核（投稿/新增剧集进入待审核状态），false 表示直接发布
      */
     private boolean isAutoReviewEnabled() {
-        String redisKey = BaseConstant.WEB_CONFIG_REDIS_KEY_PREFIX + BaseConstant.WEB_CONFIG_CATEGORY_REVIEW;
-        // 1. 尝试从 Redis 缓存读取
-        String cached = stringRedisTemplate.opsForValue().get(redisKey);
-        if (StringUtils.isNotEmpty(cached)) {
-            try {
-                List<WebConfigVo> list = objectMapper.readValue(cached,
-                        new TypeReference<List<WebConfigVo>>() {});
-                for (WebConfigVo vo : list) {
-                    if (BaseConstant.WEB_CONFIG_KEY_VIDEO_REVIEW.equals(vo.getKey())) {
-                        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(vo.getValue());
-                    }
-                }
-                return false;
-            } catch (JsonProcessingException ignored) {
-                // 缓存数据异常，回源数据库
-            }
-        }
-        // 2. Redis 未命中或数据异常，查数据库
-        LambdaQueryWrapper<WebConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(WebConfig::getCategory, BaseConstant.WEB_CONFIG_CATEGORY_REVIEW)
-                .eq(WebConfig::getKey, BaseConstant.WEB_CONFIG_KEY_VIDEO_REVIEW);
-        WebConfig config = webConfigMapper.selectOne(wrapper);
-        return config != null && BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(config.getValue());
+        return webConfigService.getConfigBoolean(
+                BaseConstant.WEB_CONFIG_CATEGORY_REVIEW, BaseConstant.WEB_CONFIG_KEY_VIDEO_REVIEW);
     }
 
     /**

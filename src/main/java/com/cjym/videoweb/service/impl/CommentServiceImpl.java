@@ -12,7 +12,6 @@ import com.cjym.videoweb.mapper.CommentMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
-import com.cjym.videoweb.mapper.WebConfigMapper;
 import com.cjym.videoweb.model.dto.CommentClientSaveDto;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
@@ -20,21 +19,16 @@ import com.cjym.videoweb.model.entity.CommentLike;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
-import com.cjym.videoweb.model.entity.WebConfig;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import com.cjym.videoweb.model.vo.EpisodeCommentCountVo;
-import com.cjym.videoweb.model.vo.WebConfigVo;
 import com.cjym.videoweb.service.CommentService;
+import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.JWTUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -58,13 +52,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     private UserInfoMapper userInfoMapper;
 
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private ObjectMapper objectMapper;
-
-    @Resource
-    private WebConfigMapper webConfigMapper;
+    private WebConfigService webConfigService;
 
     @Resource
     private VideoMapper videoMapper;
@@ -96,7 +84,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         Long parentId = dto.getParentId() != null && dto.getParentId() != 0 ? dto.getParentId() : 0L;
         comment.setParentId(parentId);
 
-        // 根据 comment_review 配置决定评论状态：免审则直接正常，否则进入待审核
+        // 根据 comment_review 配置决定评论状态：开启审核则进入待审核，否则直接正常发布
         comment.setStatus(isCommentAutoReviewEnabled() ? CommentConstant.STATUS_PENDING_REVIEW : CommentConstant.STATUS_NORMAL );
 
         if (parentId == 0L) {
@@ -387,34 +375,13 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     // ==================== 私有方法 ====================
 
     /**
-     * 查询 Redis 中 review 分类下的 comment_review 配置，判断评论是否免审核
+     * 查询 review 分类下的 comment_review 配置，判断评论是否开启审核
      *
-     * @return true 表示开启免审（评论直接发布，状态为正常）
+     * @return true 表示开启审核（评论发布后进入待审核状态），false 表示直接正常发布
      */
     private boolean isCommentAutoReviewEnabled() {
-        String redisKey = BaseConstant.WEB_CONFIG_REDIS_KEY_PREFIX + BaseConstant.WEB_CONFIG_CATEGORY_REVIEW;
-        // 1. 尝试从 Redis 缓存读取
-        String cached = stringRedisTemplate.opsForValue().get(redisKey);
-        if (StringUtils.isNotEmpty(cached)) {
-            try {
-                List<WebConfigVo> list = objectMapper.readValue(cached,
-                        new TypeReference<List<WebConfigVo>>() {});
-                for (WebConfigVo vo : list) {
-                    if (BaseConstant.WEB_CONFIG_KEY_COMMENT_REVIEW.equals(vo.getKey())) {
-                        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(vo.getValue());
-                    }
-                }
-                return false;
-            } catch (JsonProcessingException ignored) {
-                // 缓存数据异常，回源数据库
-            }
-        }
-        // 2. Redis 未命中或数据异常，查数据库
-        LambdaQueryWrapper<WebConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(WebConfig::getCategory, BaseConstant.WEB_CONFIG_CATEGORY_REVIEW)
-                .eq(WebConfig::getKey, BaseConstant.WEB_CONFIG_KEY_COMMENT_REVIEW);
-        WebConfig config = webConfigMapper.selectOne(wrapper);
-        return config != null && !BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(config.getValue());
+        return webConfigService.getConfigBoolean(
+                BaseConstant.WEB_CONFIG_CATEGORY_REVIEW, BaseConstant.WEB_CONFIG_KEY_COMMENT_REVIEW);
     }
 
     /**
