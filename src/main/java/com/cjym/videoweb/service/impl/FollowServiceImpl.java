@@ -10,6 +10,7 @@ import com.cjym.videoweb.mapper.UserInfoMapper;
 import com.cjym.videoweb.model.dto.FollowListDto;
 import com.cjym.videoweb.model.entity.Follow;
 import com.cjym.videoweb.model.entity.UserInfo;
+import com.cjym.videoweb.model.event.FollowChangedEvent;
 import com.cjym.videoweb.model.vo.FansListVo;
 import com.cjym.videoweb.model.vo.FollowListVo;
 import com.cjym.videoweb.service.FollowService;
@@ -17,6 +18,7 @@ import com.cjym.videoweb.utils.JWTUtil;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -26,6 +28,9 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
 
     @Resource
     private UserInfoMapper userInfoMapper;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public void follow(String followUserUid) {
@@ -40,6 +45,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         }
         // 已有取关记录则直接恢复
         if (baseMapper.restoreFollow(currentUserId, followUserId) > 0) {
+            publishFollowChanged(currentUserId, followUserId);
             return;
         }
         // 已关注则幂等返回
@@ -53,6 +59,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         follow.setUserId(currentUserId);
         follow.setFollowUserId(followUserId);
         baseMapper.insert(follow);
+        publishFollowChanged(currentUserId, followUserId);
     }
 
     @Override
@@ -65,8 +72,17 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         LambdaQueryWrapper<Follow> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Follow::getUserId, currentUserId)
                 .eq(Follow::getFollowUserId, followUserId);
-        // 逻辑删除（幂等，未关注时删除0行）
-        baseMapper.delete(wrapper);
+        // 逻辑删除（幂等，未关注时删除0行）；关注关系真正变化时才发布事件
+        if (baseMapper.delete(wrapper) > 0) {
+            publishFollowChanged(currentUserId, followUserId);
+        }
+    }
+
+    /**
+     * 关注关系变化后发布事件（ES 索引同步等外部逻辑由监听器处理，业务代码保持解耦）
+     */
+    private void publishFollowChanged(Long currentUserId, Long followUserId) {
+        eventPublisher.publishEvent(new FollowChangedEvent(currentUserId, followUserId));
     }
 
     @Override

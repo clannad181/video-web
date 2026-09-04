@@ -47,9 +47,9 @@ file:
     path: D:/uploads                # 文件存储根路径
     url-prefix: /api/file/preview   # 文件访问地址前缀
     chunk-size: 5MB                 # 单个分片最大大小
-# Elasticsearch 配置（聚合搜索）
+# Elasticsearch 配置
 elasticsearch:
-  enabled: false                     # 总开关：true 时装配 ES 客户端，配合 web_config 中 search/es_search=true 时搜索走 ES
+  enabled: true                     # 总开关：true 时装配 ES 客户端，配合 web_config 中 search/es_search=true 时搜索走 ES
   uris: http://192.168.225.129:9200  # ES 服务地址
 
 # MyBatis-Plus 配置

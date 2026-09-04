@@ -39,4 +39,7 @@ public class UpUserVo {
 
     @Schema(description = "累计播放数（所有剧集播放数之和）")
     private Long totalPlayCount;
+
+    @Schema(description = "当前用户是否已关注该UP主")
+    private Boolean isFollowed;
 }

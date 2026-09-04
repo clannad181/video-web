@@ -101,4 +101,10 @@ public interface UserInfoService extends IService<UserInfo> {
      * 聚合搜索UP主分页：模糊匹配昵称或uid（keyword 不传返回全部），含UP主完整公开信息，按排序白名单列倒序
      */
     IPage<UpUserVo> pageSearchUp(String keyword, Integer page, Integer size, String sortType);
+
+    /**
+     * 按uid获取指定UP主的公开信息：含昵称/头像/签名/性别/大会员/关注数/粉丝数/累计获赞/累计播放，
+     * 及当前用户是否已关注（游客可访问，未登录时 isFollowed 为 false）
+     */
+    UpUserVo getUpUserInfo(String userUid);
 }

@@ -58,17 +58,65 @@ public class WatchHistoryServiceImpl extends ServiceImpl<WatchHistoryMapper, Wat
         if (currentUserId == null) {
             throw new GlobeException("请先登录");
         }
+        LambdaQueryWrapper<Video> videoQueryWrapper = new LambdaQueryWrapper<>();
+        videoQueryWrapper.eq(Video::getAvid, dto.getVideoId());
+        Video video = videoMapper.selectOne(videoQueryWrapper);
+        if (video == null) {
+            throw new GlobeException("视频不存在");
+        }
+        Long videoId = video.getId();
+        LambdaQueryWrapper<VideoEpisode> queryWrapperEpisode = new LambdaQueryWrapper<>();
+        queryWrapperEpisode.eq(VideoEpisode::getAvid, dto.getEpisodeId());
+        queryWrapperEpisode.eq(VideoEpisode::getVideoId, videoId);
+        VideoEpisode videoEpisode = videoEpisodeMapper.selectOne(queryWrapperEpisode);
+        if (videoEpisode == null) {
+            throw new GlobeException("剧集不存在");
+        }
+        Long episodeId = videoEpisode.getId();
+        LambdaQueryWrapper<WatchHistory> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(WatchHistory::getVideoId, videoId);
+        queryWrapper.eq(WatchHistory::getEpisodeId, episodeId);
+        queryWrapper.eq(WatchHistory::getUserId, currentUserId);
+        queryWrapper.orderByDesc(WatchHistory::getCreateTime);
+        queryWrapper.last("limit 1");
+        List<WatchHistory> existHistorys = baseMapper.selectList(queryWrapper);
+        if(existHistorys!=null&& !existHistorys.isEmpty()){
+            WatchHistory watchHistory = existHistorys.getFirst();
+            watchHistory.setWatchedSeconds(dto.getWatchedSeconds());
+            baseMapper.updateById(watchHistory);
+        }
+    }
 
-        // 构建播放跳转链接
-        String playLink = buildPlayLink(dto.getVideoId(), dto.getEpisodeId());
-        WatchHistory wh = new WatchHistory();
-        wh.setUserId(currentUserId);
-        wh.setVideoId(dto.getVideoId());
-        wh.setEpisodeId(dto.getEpisodeId());
-        wh.setWatchedSeconds(dto.getWatchedSeconds());
-        wh.setPlayLink(playLink);
-        wh.setWatchTime(LocalDateTime.now());
-        baseMapper.insert(wh);
+    public void record(Long videoId, Long episodeId) {
+        if (videoId == null) {
+            throw new GlobeException("视频ID不能为空");
+        }
+        if (episodeId == null) {
+            throw new GlobeException("观看集数不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        //判断当天内有没有该记录
+        LambdaQueryWrapper<WatchHistory> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(WatchHistory::getVideoId, videoId);
+        queryWrapper.eq(WatchHistory::getEpisodeId, episodeId);
+        queryWrapper.eq(WatchHistory::getUserId, currentUserId);
+        queryWrapper.ge(WatchHistory::getWatchTime, LocalDateTime.now().minusDays(1));
+        List<WatchHistory> watchHistories = baseMapper.selectList(queryWrapper);
+        if (watchHistories == null || watchHistories.isEmpty()) {
+            String playLink = buildPlayLink(videoId, episodeId);
+            WatchHistory wh = new WatchHistory();
+            wh.setUserId(currentUserId);
+            wh.setVideoId(videoId);
+            wh.setEpisodeId(episodeId);
+            wh.setWatchedSeconds(0L);
+            wh.setPlayLink(playLink);
+            wh.setWatchTime(LocalDateTime.now());
+            baseMapper.insert(wh);
+            return;
+        }
     }
 
     @Override
@@ -80,11 +128,7 @@ public class WatchHistoryServiceImpl extends ServiceImpl<WatchHistoryMapper, Wat
         if (getCurrentUserId() == null) {
             return;
         }
-        WatchHistorySaveDto dto = new WatchHistorySaveDto();
-        dto.setVideoId(videoId);
-        dto.setEpisodeId(episodeId);
-        dto.setWatchedSeconds(0L);
-        record(dto);
+        record(videoId,episodeId);
     }
 
     //todo 分页没用
@@ -307,9 +351,9 @@ public class WatchHistoryServiceImpl extends ServiceImpl<WatchHistoryMapper, Wat
         if (episodeId != null) {
             VideoEpisode episode = videoEpisodeMapper.selectById(episodeId);
             if (episode != null && episode.getAvid() != null) {
-                return "/admin/video/" + video.getAvid() + "/episode/" + episode.getAvid();
+                return "/client/video/" + video.getAvid() + "/episode/" + episode.getAvid();
             }
         }
-        return "/admin/video/" + video.getAvid();
+        return "/client/video/" + video.getAvid();
     }
 }

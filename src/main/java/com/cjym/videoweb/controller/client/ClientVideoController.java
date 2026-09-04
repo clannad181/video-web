@@ -50,6 +50,24 @@ public class ClientVideoController {
         return R.success(videoService.pageClientVideo(page, size, sortType, categoryId));
     }
 
+    /**
+     * 分页查询指定用户（UP主）的所有投稿
+     *
+     * @param userUid  用户uid
+     * @param page     页码，从1开始（默认1）
+     * @param size     每页数量（默认10）
+     * @param sortType 排序方式：latest（按发布时间倒序，默认）/hot（按播放量倒序）
+     */
+    @GetMapping("/user-videos")
+    @Operation(summary = "指定用户的所有投稿", description = "分页查询指定用户（UP主）的投稿视频（仅已发布且至少有一集审核通过），sortType 可选 latest（按发布时间倒序，默认）/hot（按播放量倒序），游客可访问，含播放跳转链接与关注标记，用户不存在时报错")
+    public R<IPage<ClientVideoVo>> userVideos(
+            @Parameter(description = "用户uid") @RequestParam String userUid,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @Parameter(description = "排序方式（latest/hot）") @RequestParam(required = false) String sortType) {
+        return R.success(videoService.pageUserVideos(userUid, page, size, sortType));
+    }
+
     @GetMapping("/recommend")
     @Operation(summary = "视频推荐", description = "已登录：返回所有关注UP主的最新视频6条，关注视频不足6条（含关注数为0）时用最多收藏的视频补齐；未登录：返回最多收藏的视频")
     public R<List<ClientVideoVo>> recommend() {

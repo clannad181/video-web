@@ -44,7 +44,6 @@ import com.cjym.videoweb.service.CommentService;
 import com.cjym.videoweb.service.EsSearchService;
 import com.cjym.videoweb.service.VideoService;
 import com.cjym.videoweb.service.WatchHistoryService;
-import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.Base62Converter;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.SnowflakeIdGenerator;
@@ -111,11 +110,14 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     @Resource
     private CommentService commentService;
 
+    /**
+     * 聚合搜索门面：按开关在 ES 与数据库适配器间路由，ES 异常自动降级数据库
+     */
     @Resource
-    private WebConfigService webConfigService;
+    private SearchServiceFacade searchServiceFacade;
 
     /**
-     * ES 聚合搜索服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（搜索走数据库）
+     * ES 索引同步服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（埋点静默跳过）
      */
     @Resource
     private ObjectProvider<EsSearchService> esSearchServiceProvider;
@@ -132,14 +134,6 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     private static final Set<String> ALLOWED_DIRECTIONS = Set.of("ASC", "DESC");
 
-    /**
-     * 前台视频排序类型 → ORDER BY 列 映射（latest:按发布时间最新 hot:按播放量最火热）
-     */
-    private static final Map<String, String> CLIENT_SORT_COLUMN_MAP = Map.of(
-            VideoConstant.SORT_LATEST, "v.create_time",
-            VideoConstant.SORT_HOT, "play_count"
-    );
-
     @Override
     public IPage<VideoPageDto> pageVideo(Integer page, Integer size, String title,
                                          Long categoryId, Integer videoStates, String nickName, String uid,
@@ -153,9 +147,28 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Override
     public IPage<ClientVideoVo> pageClientVideo(Integer page, Integer size, String sortType, Long categoryId) {
-        Page<ClientVideoVo> pageParam = new Page<>(page, size);
-        String orderColumn = resolveClientSortColumn(sortType);
-        IPage<ClientVideoVo> result = baseMapper.selectClientVideoPage(pageParam, orderColumn, categoryId);
+        // 搜索实现（ES/数据库适配器）由 SearchServiceFacade 按开关路由，ES 异常自动降级数据库
+        IPage<ClientVideoVo> result = searchServiceFacade.listVideo(page, size, sortType, categoryId);
+        // 填充当前用户是否已关注UP主的标记
+        fillFollowStatus(result.getRecords());
+        // 填充播放跳转链接
+        fillPlayLink(result.getRecords());
+        return result;
+    }
+
+    @Override
+    public IPage<ClientVideoVo> pageUserVideos(String userUid, Integer page, Integer size, String sortType) {
+        if (userUid == null || userUid.isBlank()) {
+            throw new GlobeException("UP主uid不能为空");
+        }
+        // 按 uid 反查 UP主id（对外接口参数不使用数据库主键）
+        UserInfo up = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>()
+                .eq(UserInfo::getUid, userUid.trim()));
+        if (up == null) {
+            throw new GlobeException("UP主不存在");
+        }
+        // 搜索实现（ES/数据库适配器）由 SearchServiceFacade 按开关路由，ES 异常自动降级数据库
+        IPage<ClientVideoVo> result = searchServiceFacade.listUserVideos(up.getId(), page, size, sortType);
         // 填充当前用户是否已关注UP主的标记
         fillFollowStatus(result.getRecords());
         // 填充播放跳转链接
@@ -1030,51 +1043,14 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         return vo;
     }
 
-    /**
-     * 聚合搜索视频排序类型 → ORDER BY 列 映射（latest:按发布时间 hot:按播放量 favorite:按收藏数）
-     */
-    private static final Map<String, String> SEARCH_SORT_COLUMN_MAP = Map.of(
-            VideoConstant.SORT_LATEST, "v.create_time",
-            VideoConstant.SORT_HOT, "play_count",
-            VideoConstant.SORT_FAVORITE, "favorite_count"
-    );
-
     @Override
     public IPage<ClientVideoVo> pageSearchVideo(String keyword, Integer page, Integer size, String sortType) {
-        // ES 已装配且 web_config 开关开启：走 Elasticsearch，异常自动降级数据库查询
-        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
-        if (esSearchService != null && isEsSearchEnabled()) {
-            try {
-                IPage<ClientVideoVo> result = esSearchService.searchVideo(keyword, page, size, sortType);
-                fillPlayLink(result.getRecords());
-                fillFollowStatus(result.getRecords());
-                return result;
-            } catch (Exception e) {
-                log.warn("ES 视频搜索失败，降级为数据库查询: {}", e.getMessage());
-            }
-        }
-        int pageNum = page != null ? page : 1;
-        int pageSize = size != null ? size : 10;
-        // 排序白名单解析：非法值降级为最新排序
-        String key = sortType == null || sortType.isBlank()
-                ? VideoConstant.SORT_LATEST
-                : sortType.trim().toLowerCase();
-        String orderColumn = SEARCH_SORT_COLUMN_MAP.getOrDefault(key, SEARCH_SORT_COLUMN_MAP.get(VideoConstant.SORT_LATEST));
-        String trimKeyword = StringUtils.isNotEmpty(keyword) ? keyword.trim() : null;
-        IPage<ClientVideoVo> result = baseMapper.selectSearchVideoPage(new Page<>(pageNum, pageSize), trimKeyword, orderColumn);
+        // 搜索实现（ES/数据库适配器）由 SearchServiceFacade 按开关路由，ES 异常自动降级数据库
+        IPage<ClientVideoVo> result = searchServiceFacade.searchVideo(keyword, page, size, sortType);
         // 填充播放跳转链接与关注标记
         fillPlayLink(result.getRecords());
         fillFollowStatus(result.getRecords());
         return result;
-    }
-
-    /**
-     * 聚合搜索是否走 Elasticsearch（web_config 中 search/es_search 配置，Redis缓存优先）
-     */
-    private boolean isEsSearchEnabled() {
-        String value = webConfigService.getConfigValue(
-                BaseConstant.WEB_CONFIG_CATEGORY_SEARCH, BaseConstant.WEB_CONFIG_KEY_ES_SEARCH);
-        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(value);
     }
 
     /**
@@ -1271,16 +1247,6 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         String upper = descOrAsc.toUpperCase();
         return ALLOWED_DIRECTIONS.contains(upper) ? upper : null;
-    }
-
-    /**
-     * 前台视频排序类型白名单解析，仅允许 latest/hot，非法值降级为最新排序
-     */
-    private String resolveClientSortColumn(String sortType) {
-        String key = sortType == null || sortType.isBlank()
-                ? VideoConstant.SORT_LATEST
-                : sortType.trim().toLowerCase();
-        return CLIENT_SORT_COLUMN_MAP.getOrDefault(key, CLIENT_SORT_COLUMN_MAP.get(VideoConstant.SORT_LATEST));
     }
 
     /**

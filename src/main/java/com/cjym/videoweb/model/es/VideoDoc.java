@@ -44,6 +44,9 @@ public class VideoDoc {
     /** UP主用户id */
     private Long userId;
 
+    /** 分类id（用于按分类筛选） */
+    private Long categoryId;
+
     /** 分类名称 */
     private String categoryName;
 

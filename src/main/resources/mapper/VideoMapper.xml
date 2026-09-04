@@ -99,6 +99,7 @@
         <result column="episode_count" property="episodeCount" jdbcType="INTEGER"/>
         <result column="play_count" property="playCount" jdbcType="BIGINT"/>
         <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
+        <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
         <result column="category_name" property="categoryName" jdbcType="VARCHAR"/>
         <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
         <result column="user_id" property="userId" jdbcType="BIGINT"/>
@@ -116,7 +117,7 @@
                (SELECT e.avid FROM public.video_episode e
                 WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
                 ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
-               v.is_ongoing, v.create_time, v.user_id,
+               v.is_ongoing, v.create_time, v.user_id, v.category_id,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid
         FROM public.video_info v
@@ -126,6 +127,9 @@
           AND v.video_status = 2
           <if test="categoryId != null">
           AND v.category_id = #{categoryId}
+          </if>
+          <if test="userId != null">
+          AND v.user_id = #{userId}
           </if>
           AND (SELECT COUNT(*) FROM public.video_episode e
                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
@@ -140,7 +144,7 @@
                (SELECT e.avid FROM public.video_episode e
                 WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
                 ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
-               v.is_ongoing, v.create_time, v.user_id,
+               v.is_ongoing, v.create_time, v.user_id, v.category_id,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid
         FROM public.video_info v

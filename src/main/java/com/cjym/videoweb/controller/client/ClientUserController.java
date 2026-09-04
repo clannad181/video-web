@@ -3,10 +3,12 @@ package com.cjym.videoweb.controller.client;
 import com.cjym.videoweb.model.dto.ClientUserUpdateDto;
 import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.ClientUserVo;
+import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.UserInfoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,6 +46,18 @@ public class ClientUserController {
     @Operation(summary = "获取前台用户基础信息", description = "获取当前登录前台用户的基础信息（不含角色和菜单）")
     public R<ClientUserVo> getUserInfo(HttpServletRequest request) {
         return userInfoService.getClientUserInfo(request);
+    }
+
+    /**
+     * 按uid获取指定UP主的公开信息（游客可访问，未登录时 isFollowed 为 false）
+     *
+     * @param userUid UP主uid（16位随机数字）
+     */
+    @GetMapping("/up-info")
+    @Operation(summary = "获取指定UP主的公开信息", description = "按uid获取指定UP主的公开信息（uid/昵称/头像/签名/性别/大会员/关注数/粉丝数/累计获赞/累计播放/当前用户是否已关注），游客可访问（未登录时 isFollowed 为 false），UP主不存在时报错")
+    public R<UpUserVo> getUpUserInfo(
+            @Parameter(description = "UP主uid（16位随机数字）") @RequestParam String userUid) {
+        return R.success(userInfoService.getUpUserInfo(userUid));
     }
 
     @PostMapping("/update")

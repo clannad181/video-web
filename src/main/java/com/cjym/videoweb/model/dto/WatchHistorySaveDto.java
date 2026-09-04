@@ -8,10 +8,10 @@ import lombok.Data;
 public class WatchHistorySaveDto {
 
     @Schema(description = "视频ID", required = true)
-    private Long videoId;
+    private String videoId;
 
     @Schema(description = "剧集ID（单集视频不传）")
-    private Long episodeId;
+    private String episodeId;
 
     @Schema(description = "已观看秒数", required = true)
     private Long watchedSeconds;

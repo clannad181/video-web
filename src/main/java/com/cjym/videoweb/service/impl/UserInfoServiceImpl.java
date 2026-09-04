@@ -57,6 +57,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -99,7 +101,13 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     private WebConfigService webConfigService;
 
     /**
-     * ES 聚合搜索服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（搜索走数据库）
+     * 聚合搜索门面：按开关在 ES 与数据库适配器间路由，ES 异常自动降级数据库
+     */
+    @Resource
+    private SearchServiceFacade searchServiceFacade;
+
+    /**
+     * ES 索引同步服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（埋点静默跳过）
      */
     @Resource
     private ObjectProvider<EsSearchService> esSearchServiceProvider;
@@ -190,7 +198,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         String refreshToken = JWTUtil.createRefreshToken(user.getId(), serverType,
                 user.getUsername(),
                 tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
-        saveRefreshToken(refreshToken,user.getUsername());
+        saveRefreshToken(refreshToken,user.getId());
         return R.success(Map.of("accessToken",accessToken,"refreshToken",refreshToken));
     }
 
@@ -339,6 +347,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         String newRefreshToken = JWTUtil.createRefreshToken(userDetails.getId(), serverType,
                 userDetails.getUsername(),
                 tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
+        saveRefreshToken(newRefreshToken,userId);
         // 5. 返回新的 Token 对
         return R.success(Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken));
     }
@@ -509,42 +518,105 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         return vo;
     }
 
-    /**
-     * UP主搜索排序类型 → ORDER BY 列 映射（fans:按粉丝数 like:按累计获赞 play:按累计播放）
-     */
-    private static final Map<String, String> UP_SEARCH_SORT_COLUMN_MAP = Map.of(
-            "fans", "fans_count",
-            "like", "total_like_count",
-            "play", "total_play_count"
-    );
-
     @Override
     public IPage<UpUserVo> pageSearchUp(String keyword, Integer page, Integer size, String sortType) {
-        // ES 已装配且 web_config 开关开启：走 Elasticsearch，异常自动降级数据库查询
-        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
-        if (esSearchService != null && isEsSearchEnabled()) {
-            try {
-                return esSearchService.searchUp(keyword, page, size, sortType);
-            } catch (Exception e) {
-                log.warn("ES UP主搜索失败，降级为数据库查询: {}", e.getMessage());
-            }
+        // 搜索实现（ES/数据库适配器）由 SearchServiceFacade 按开关路由，ES 异常自动降级数据库
+        IPage<UpUserVo> result = searchServiceFacade.searchUp(keyword, page, size, sortType);
+        // 关注数/粉丝数由 ES 文档返回（事件机制同步维护）或数据库查询自带，这里仅填充当前用户是否已关注
+        fillFollowStatus(result.getRecords());
+        return result;
+    }
+
+    @Override
+    public UpUserVo getUpUserInfo(String userUid) {
+        if (userUid == null || userUid.isBlank()) {
+            throw new GlobeException("UP主uid不能为空");
         }
-        int pageNum = page != null ? page : 1;
-        int pageSize = size != null ? size : 10;
-        // 排序白名单解析：非法值返回 null（走默认粉丝数降序）
-        String orderColumn = UP_SEARCH_SORT_COLUMN_MAP.get(
-                sortType == null || sortType.isBlank() ? "fans" : sortType.trim().toLowerCase());
-        String trimKeyword = StringUtils.isNotEmpty(keyword) ? keyword.trim() : null;
-        return baseMapper.selectSearchUpPage(new Page<>(pageNum, pageSize), trimKeyword, orderColumn);
+        UserInfo user = baseMapper.selectOne(new LambdaQueryWrapper<UserInfo>()
+                .eq(UserInfo::getUid, userUid.trim()));
+        if (user == null) {
+            throw new GlobeException("UP主不存在");
+        }
+        UpUserVo vo = new UpUserVo();
+        vo.setUid(user.getUid());
+        vo.setNikeName(user.getNikeName());
+        vo.setAvatar(user.getAvatar());
+        vo.setDescript(user.getDescript());
+        vo.setSex(user.getSex());
+        vo.setIsVip(user.getIsVip());
+        // 关注数/粉丝数（@TableLogic 自动过滤已取关记录）
+        vo.setFollowCount(followMapper.selectCount(new LambdaQueryWrapper<Follow>()
+                .eq(Follow::getUserId, user.getId())));
+        vo.setFansCount(followMapper.selectCount(new LambdaQueryWrapper<Follow>()
+                .eq(Follow::getFollowUserId, user.getId())));
+        // 累计获赞/累计播放（无投稿时为0）
+        UserEpisodeStatsVo stats = videoMapper.selectUserEpisodeStats(user.getId());
+        vo.setTotalLikeCount(stats == null ? 0L : stats.getTotalLikeCount());
+        vo.setTotalPlayCount(stats == null ? 0L : stats.getTotalPlayCount());
+        // 当前用户是否已关注（游客为 false）
+        Long currentUserId = getCurrentUserId();
+        vo.setIsFollowed(currentUserId != null && followMapper.selectCount(new LambdaQueryWrapper<Follow>()
+                .eq(Follow::getUserId, currentUserId)
+                .eq(Follow::getFollowUserId, user.getId())) > 0);
+        return vo;
     }
 
     /**
-     * 聚合搜索是否走 Elasticsearch（web_config 中 search/es_search 配置，Redis缓存优先）
+     * 为UP主搜索记录填充当前用户是否已关注的标记（未登录时全部为 false）；
+     * 先按 uid 批量反查用户主键id，再一次查询当前用户的关注记录，避免逐条查询
      */
-    private boolean isEsSearchEnabled() {
-        String value = webConfigService.getConfigValue(
-                BaseConstant.WEB_CONFIG_CATEGORY_SEARCH, BaseConstant.WEB_CONFIG_KEY_ES_SEARCH);
-        return BaseConstant.WEB_CONFIG_VALUE_TRUE.equalsIgnoreCase(value);
+    private void fillFollowStatus(List<UpUserVo> vos) {
+        if (vos == null || vos.isEmpty()) {
+            return;
+        }
+        vos.forEach(vo -> vo.setIsFollowed(false));
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return;
+        }
+        // uid → 用户主键id（follow 表按主键关联）
+        List<String> uids = vos.stream().map(UpUserVo::getUid)
+                .filter(uid -> uid != null && !uid.isBlank())
+                .toList();
+        if (uids.isEmpty()) {
+            return;
+        }
+        Map<String, Long> uidIdMap = baseMapper.selectList(new LambdaQueryWrapper<UserInfo>()
+                        .select(UserInfo::getUid, UserInfo::getId)
+                        .in(UserInfo::getUid, uids)).stream()
+                .collect(Collectors.toMap(UserInfo::getUid, UserInfo::getId, (a, b) -> a));
+        Set<Long> followedIds = followMapper.selectList(new LambdaQueryWrapper<Follow>()
+                        .eq(Follow::getUserId, currentUserId)
+                        .in(Follow::getFollowUserId, uidIdMap.values())).stream()
+                .map(Follow::getFollowUserId)
+                .collect(Collectors.toSet());
+        vos.forEach(vo -> {
+            Long userId = uidIdMap.get(vo.getUid());
+            vo.setIsFollowed(userId != null && followedIds.contains(userId));
+        });
+    }
+
+    /**
+     * 从请求头解析当前登录用户id（未携带合法 token 时返回 null）
+     */
+    private Long getCurrentUserId() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes == null) {
+                return null;
+            }
+            HttpServletRequest request = attributes.getRequest();
+            String token = request.getHeader("authorization");
+            if (StringUtils.isEmpty(token)) {
+                return null;
+            }
+            if (token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+            return JWTUtil.getUserId(token);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -562,10 +634,10 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
     }
 
-    public void saveRefreshToken(String refreshToken,String username) {
+    public void saveRefreshToken(String refreshToken,Long userId) {
         // 计算 token 的剩余有效期（毫秒）
         long expiration = JWTUtil.parseClaims(refreshToken).getExpiration().getTime() - System.currentTimeMillis();
-        String userZSetKey = BaseConstant.USER_TOKENS_ZSET_PREFIX + username;
+        String userZSetKey = BaseConstant.USER_TOKENS_ZSET_PREFIX + userId;
         // 2. 清理 ZSet 中已过期的 token（可选，确保计数准确）
         cleanExpiredTokens(userZSetKey);
         // 3. 检查该用户的当前有效会话数
@@ -582,7 +654,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
             }
         }
         // 4. 存储新 Token：refresh_token:xxxxx -> username
-        stringRedisTemplate.opsForValue().set(BaseConstant.REFRESH_TOKEN_PREFIX + refreshToken, username, expiration, TimeUnit.MILLISECONDS);
+        stringRedisTemplate.opsForValue().set(BaseConstant.REFRESH_TOKEN_PREFIX + refreshToken, userId.toString(), expiration, TimeUnit.MILLISECONDS);
         // 5. 将新 Token 加入用户 ZSet，score 为当前时间戳
         stringRedisTemplate.opsForZSet().add(userZSetKey, refreshToken, System.currentTimeMillis());
         // 这里设置一个较长的时间，保证不会无限增长

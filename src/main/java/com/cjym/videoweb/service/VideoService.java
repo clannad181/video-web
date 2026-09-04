@@ -41,6 +41,12 @@ public interface VideoService extends IService<Video> {
     IPage<ClientVideoVo> pageClientVideo(Integer page, Integer size, String sortType, Long categoryId);
 
     /**
+     * 指定UP主投稿分页：按userUid定位UP主，返回其已发布且至少一集审核通过的投稿（游客可访问），
+     * 按发布时间（latest）/播放量（hot）倒序，含播放跳转链接与关注标记
+     */
+    IPage<ClientVideoVo> pageUserVideos(String userUid, Integer page, Integer size, String sortType);
+
+    /**
      * 前台视频推荐：已登录返回关注的UP主最新视频（不足时用最多收藏补齐），未登录返回最多收藏视频，最多6条
      */
     List<ClientVideoVo> recommend();
