@@ -17,6 +17,7 @@ import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.DataCenterVo;
 import com.cjym.videoweb.model.vo.MonthlyContributionVo;
 import com.cjym.videoweb.model.vo.MyContributionVideoVo;
+import com.cjym.videoweb.model.vo.RecommendVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -47,9 +48,11 @@ public interface VideoService extends IService<Video> {
     IPage<ClientVideoVo> pageUserVideos(String userUid, Integer page, Integer size, String sortType);
 
     /**
-     * 前台视频推荐：已登录返回关注的UP主最新视频（不足时用最多收藏补齐），未登录返回最多收藏视频，最多6条
+     * 首页视频推荐（banner + cards 两部分，各6条）：
+     * banner：已登录且有画像时按画像兴趣（分类/标签）推荐并排除已观看，无画像或未登录时返回最多收藏的视频；
+     * cards：已登录返回关注的UP主最新视频（排除banner已推荐，不足时用最多收藏补齐），未登录返回最新发布视频
      */
-    List<ClientVideoVo> recommend();
+    RecommendVo recommend();
 
     /**
      * 相关视频推荐分页：根据视频avid查询同UP主或标签有交集的视频（排除自身，仅已发布且至少有一集审核通过）；
@@ -79,8 +82,10 @@ public interface VideoService extends IService<Video> {
 
     /**
      * 编辑视频
+     *
+     * @return 编辑后的视频实体（供 @NotifyMessage 切面引用）
      */
-    void update(VideoSaveDto dto);
+    Video update(VideoSaveDto dto);
 
     /**
      * 删除视频（级联删除剧集和标签）
@@ -95,9 +100,9 @@ public interface VideoService extends IService<Video> {
     R<String> saveEpisodes(VideoEpisodeSaveBatchDto dto);
 
     /**
-     * 审核剧集
+     * 审核剧集（审核通过/拒绝时返回所属视频实体供 @NotifyMessage 切面通知 UP 主，重置为待审核返回 null）
      */
-    void updateReviewStatus(Long episodeId, Integer reviewStatus);
+    Video updateReviewStatus(Long episodeId, Integer reviewStatus);
     /**
      * 删除剧集
      */
@@ -145,8 +150,10 @@ public interface VideoService extends IService<Video> {
 
     /**
      * 用户端编辑投稿（按avid定位自己的视频，仅未发布前可编辑，审核流程跟随免审配置）
+     *
+     * @return 编辑后的视频实体（供 @NotifyMessage 切面引用）
      */
-    void updateContribution(VideoContributeDto dto);
+    Video updateContribution(VideoContributeDto dto);
 
     /**
      * 用户端删除投稿（按avid定位自己的视频，级联删除剧集）
@@ -192,4 +199,6 @@ public interface VideoService extends IService<Video> {
      * 聚合搜索视频分页：标题模糊搜索（keyword 不传返回全部，仅已发布且至少一集审核通过），按排序白名单列倒序，含播放跳转链接与关注标记
      */
     IPage<ClientVideoVo> pageSearchVideo(String keyword, Integer page, Integer size, String sortType);
+
+    void saveDraft(VideoContributeDto dto);
 }

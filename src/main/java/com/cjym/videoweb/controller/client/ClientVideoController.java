@@ -9,6 +9,7 @@ import com.cjym.videoweb.model.dto.VideoOngoingToggleDto;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.MonthlyContributionVo;
+import com.cjym.videoweb.model.vo.RecommendVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.VideoVo;
 import com.cjym.videoweb.exception.GlobeException;
@@ -69,8 +70,8 @@ public class ClientVideoController {
     }
 
     @GetMapping("/recommend")
-    @Operation(summary = "视频推荐", description = "已登录：返回所有关注UP主的最新视频6条，关注视频不足6条（含关注数为0）时用最多收藏的视频补齐；未登录：返回最多收藏的视频")
-    public R<List<ClientVideoVo>> recommend() {
+    @Operation(summary = "首页视频推荐", description = "返回两部分：banner（6条，已登录且有画像时按画像兴趣分类/标签匹配并排除已观看的视频，无画像或未登录时返回最多收藏的视频）+ cards（6条，已登录返回关注UP主最新视频，未登录返回最新发布视频，不足时用最多收藏的视频补齐）")
+    public R<RecommendVo> recommend() {
         return R.success(videoService.recommend());
     }
 
@@ -106,6 +107,13 @@ public class ClientVideoController {
     @Operation(summary = "投稿视频", description = "用户投稿视频（含剧集和标签），身份从token解析；审核流程跟随免审配置：免审关闭时自动发布，开启时进入待发布待审核")
     public R<String> contribute(@RequestBody VideoContributeDto dto) {
         videoService.contribute(dto);
+        return R.success("投稿成功");
+    }
+
+    @PostMapping("/saveDraft")
+    @Operation(summary = "暂存草稿", description = "用户投稿视频（含剧集和标签），身份从token解析；审核流程跟随免审配置：免审关闭时自动发布，开启时进入待发布待审核")
+    public R<String> saveDraft(@RequestBody VideoContributeDto dto) {
+        videoService.saveDraft(dto);
         return R.success("投稿成功");
     }
 

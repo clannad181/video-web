@@ -46,6 +46,9 @@ public class ClientVideoVo {
     @Schema(description = "分类id")
     private Long categoryId;
 
+    @Schema(description = "视频标签，多个以逗号分隔")
+    private String tags;
+
     @Schema(description = "UP主昵称")
     private String nickName;
 

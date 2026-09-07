@@ -59,6 +59,21 @@ public class BaseConstant {
     public static final Integer VIDEO_RECOMMEND_SIZE = 6;
 
     /**
+     * 推荐Banner基于画像的兴趣分类取数上限（按兴趣得分降序取前N个分类）
+     */
+    public static final Integer RECOMMEND_INTEREST_CATEGORY_LIMIT = 5;
+
+    /**
+     * 推荐Banner基于画像的兴趣标签取数上限（按兴趣得分降序取前N个标签）
+     */
+    public static final Integer RECOMMEND_INTEREST_TAG_LIMIT = 5;
+
+    /**
+     * 推荐Banner排除已观看视频时，观看历史取数上限（按最近观看时间倒序）
+     */
+    public static final Integer RECOMMEND_WATCHED_EXCLUDE_LIMIT = 500;
+
+    /**
      * 相关视频推荐候选视频数量上限（先查候选id再批量查详情，防止候选集合过大）
      */
     public static final Integer RELATED_VIDEO_CANDIDATE_LIMIT = 500;
@@ -96,6 +111,8 @@ public class BaseConstant {
     public static final String WEB_CONFIG_CATEGORY_DISPLAY = "display";
     /** WebConfig search 分类 */
     public static final String WEB_CONFIG_CATEGORY_SEARCH = "search";
+    /** WebConfig 服务器监控分类 */
+    public static final String WEB_CONFIG_CATEGORY_MONITOR = "monitor";
     /** WebConfig token 有效期分类 */
     public static final String WEB_CONFIG_CATEGORY_TOKEN_EXPIRY = "token_security";
     /** WebConfig 默认角色配置键 */
@@ -106,6 +123,12 @@ public class BaseConstant {
     public static final String WEB_CONFIG_KEY_COMMENT_REVIEW = "comment_review";
     /** WebConfig 聚合搜索是否走 Elasticsearch 配置键 */
     public static final String WEB_CONFIG_KEY_ES_SEARCH = "es_search";
+    /** WebConfig 服务器CPU使用率告警阈值配置键（%） */
+    public static final String MONITOR_CPU_THRESHOLD = "cpu_threshold";
+    /** WebConfig 服务器内存使用率告警阈值配置键（%） */
+    public static final String MONITOR_MEMORY_THRESHOLD = "memory_threshold";
+    /** WebConfig 服务器磁盘使用率告警阈值配置键（%） */
+    public static final String MONITOR_DISK_THRESHOLD = "disk_threshold";
 
     // ==================== WebConfig 通用值常量 ====================
     /** WebConfig 布尔真值 */

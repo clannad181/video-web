@@ -21,4 +21,5 @@ public class VideoConstant {
     public static final String SORT_HOT = "hot";
     /** 前台视频排序类型：最多收藏（按收藏数倒序） */
     public static final String SORT_FAVORITE = "favorite";
+    public static final Integer VIDEO_STATUS_DRAFT = 0;
 }

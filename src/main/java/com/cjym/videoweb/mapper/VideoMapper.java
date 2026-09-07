@@ -79,6 +79,21 @@ public interface VideoMapper extends BaseMapper<Video> {
                                           @Param("excludeIds") List<Long> excludeIds);
 
     /**
+     * 查询最新发布的视频TOP N（已发布且至少有一集审核通过），可排除指定视频
+     */
+    List<ClientVideoVo> selectLatestTop(@Param("limit") int limit,
+                                        @Param("excludeIds") List<Long> excludeIds);
+
+    /**
+     * 按用户画像兴趣推荐：分类ID命中或标签有交集的视频TOP N（已发布且至少有一集审核通过），
+     * 排除已观看视频，按收藏数倒序（供首页Banner个性化推荐）
+     */
+    List<ClientVideoVo> selectRecommendByInterests(@Param("categoryIds") List<Long> categoryIds,
+                                                   @Param("tags") List<String> tags,
+                                                   @Param("excludeIds") List<Long> excludeIds,
+                                                   @Param("limit") int limit);
+
+    /**
      * 查询用户指定时间范围内的投稿视频（含播放/收藏聚合与最新审核通过剧集avid），按投稿时间倒序
      */
     List<MyContributionVideoVo> selectMyContributions(@Param("userId") Long userId,

@@ -101,6 +101,7 @@
         <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT"/>
         <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
         <result column="category_name" property="categoryName" jdbcType="VARCHAR"/>
+        <result column="tags" property="tags" jdbcType="VARCHAR"/>
         <result column="nike_name" property="nickName" jdbcType="VARCHAR"/>
         <result column="user_id" property="userId" jdbcType="BIGINT"/>
         <result column="avatar" property="avatarUrl" jdbcType="VARCHAR"/>
@@ -144,7 +145,7 @@
                (SELECT e.avid FROM public.video_episode e
                 WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
                 ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
-               v.is_ongoing, v.create_time, v.user_id, v.category_id,
+               v.is_ongoing, v.create_time, v.user_id, v.category_id, v.tags,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid
         FROM public.video_info v
@@ -225,7 +226,7 @@
                (SELECT e.avid FROM public.video_episode e
                 WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
                 ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
-               v.is_ongoing, v.create_time, v.user_id,
+               v.is_ongoing, v.create_time, v.user_id, v.tags,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid
         FROM public.video_info v
@@ -249,7 +250,7 @@
                (SELECT e.avid FROM public.video_episode e
                 WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
                 ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
-               v.is_ongoing, v.create_time, v.user_id,
+               v.is_ongoing, v.create_time, v.user_id, v.tags,
                c.name AS category_name,
                u.nike_name, u.avatar, u.uid
         FROM public.video_info v
@@ -259,6 +260,80 @@
           AND v.video_status = 2
           AND (SELECT COUNT(*) FROM public.video_episode e
                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+        <if test="excludeIds != null and excludeIds.size() > 0">
+            AND v.id NOT IN
+            <foreach collection="excludeIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        ORDER BY favorite_count DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 前台推荐：最新发布视频TOP N（已发布且至少有一集审核通过），可排除指定视频 -->
+    <select id="selectLatestTop" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
+               v.is_ongoing, v.create_time, v.user_id, v.tags,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+        <if test="excludeIds != null and excludeIds.size() > 0">
+            AND v.id NOT IN
+            <foreach collection="excludeIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        ORDER BY v.create_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 前台推荐：按用户画像兴趣匹配视频（分类ID命中或标签有交集），排除已观看视频，按收藏数倒序 -->
+    <select id="selectRecommendByInterests" resultMap="ClientVideoResultMap">
+        SELECT v.id, v.avid, v.title, v.cover_url, v.total_duration, v.episode_count,
+               COALESCE((SELECT SUM(e.play_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS play_count,
+               COALESCE((SELECT SUM(e.favorite_count) FROM public.video_episode e WHERE e.video_id = v.id AND e.is_delete = 0), 0) AS favorite_count,
+               (SELECT e.avid FROM public.video_episode e
+                WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1
+                ORDER BY e.episode_number DESC LIMIT 1) AS episode_avid,
+               v.is_ongoing, v.create_time, v.user_id, v.category_id, v.tags,
+               c.name AS category_name,
+               u.nike_name, u.avatar, u.uid
+        FROM public.video_info v
+        LEFT JOIN public.category c ON v.category_id = c.id AND c.is_delete = 0
+        LEFT JOIN public.user_info u ON v.user_id = u.id
+        WHERE v.is_delete = 0
+          AND v.video_status = 2
+          AND (SELECT COUNT(*) FROM public.video_episode e
+               WHERE e.video_id = v.id AND e.is_delete = 0 AND e.review_status = 1) >= 1
+        <trim prefix="AND (" suffix=")" prefixOverrides="OR">
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                OR v.category_id IN
+                <foreach collection="categoryIds" item="cid" open="(" separator="," close=")">
+                    #{cid}
+                </foreach>
+            </if>
+            <if test="tags != null and tags.size() > 0">
+                OR EXISTS (
+                    SELECT 1
+                    FROM unnest(string_to_array(v.tags, ',')) AS vt(vtag)
+                    WHERE btrim(vt.vtag) IN
+                    <foreach collection="tags" item="tag" open="(" separator="," close=")">
+                        #{tag}
+                    </foreach>
+                )
+            </if>
+        </trim>
         <if test="excludeIds != null and excludeIds.size() > 0">
             AND v.id NOT IN
             <foreach collection="excludeIds" item="id" open="(" separator="," close=")">

@@ -12,6 +12,7 @@ import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -99,5 +100,11 @@ public class DatabaseSearchAdapter implements SearchAdapter {
                 : sortType.trim().toLowerCase();
         String orderColumn = CLIENT_SORT_COLUMN_MAP.getOrDefault(key, CLIENT_SORT_COLUMN_MAP.get(VideoConstant.SORT_LATEST));
         return videoMapper.selectClientVideoPage(new Page<>(pageNum, pageSize), orderColumn, null, userId);
+    }
+
+    @Override
+    public List<ClientVideoVo> recommendByInterests(List<Long> categoryIds, List<String> tags,
+                                                    List<Long> excludeIds, int limit) {
+        return videoMapper.selectRecommendByInterests(categoryIds, tags, excludeIds, limit);
     }
 }

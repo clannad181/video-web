@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * 聚合搜索门面（路由）：按开关在 ES 与数据库两种适配器间选择，
  * ES 搜索异常时自动降级数据库查询，保证聚合搜索接口稳定可用
@@ -86,6 +88,21 @@ public class SearchServiceFacade implements SearchAdapter {
             }
         }
         return databaseSearchAdapter.listUserVideos(userId, page, size, sortType);
+    }
+
+    @Override
+    public List<ClientVideoVo> recommendByInterests(List<Long> categoryIds, List<String> tags,
+                                                    List<Long> excludeIds, int limit) {
+        // ES 已装配且 web_config 开关开启：走 Elasticsearch（异常自动降级数据库查询）
+        EsSearchService esSearchService = esSearchServiceProvider.getIfAvailable();
+        if (esSearchService != null && isEsSearchEnabled()) {
+            try {
+                return esSearchService.recommendByInterests(categoryIds, tags, excludeIds, limit);
+            } catch (Exception e) {
+                log.warn("ES 兴趣推荐查询失败，降级为数据库查询: {}", e.getMessage());
+            }
+        }
+        return databaseSearchAdapter.recommendByInterests(categoryIds, tags, excludeIds, limit);
     }
 
     /**

@@ -214,4 +214,47 @@
           AND watch_time::date = CURRENT_DATE
     </select>
 
+    <!-- ==================== 用户画像算法数据源 ==================== -->
+
+    <resultMap id="WatchStatsResultMap" type="com.cjym.videoweb.model.vo.WatchStatsVo">
+        <result column="video_id" property="videoId"/>
+        <result column="total_seconds" property="totalSeconds"/>
+        <result column="last_watch_time" property="lastWatchTime"/>
+    </resultMap>
+
+    <!-- 查询时间窗内有观看记录的用户ID列表（去重） -->
+    <select id="selectProfileUserIds" resultType="long">
+        SELECT DISTINCT user_id
+        FROM public.watch_history
+        WHERE is_delete = 0
+          AND watch_time &gt;= #{since}
+        ORDER BY user_id
+    </select>
+
+    <!-- 按视频聚合用户观看统计（累计观看秒数与最近观看时间） -->
+    <select id="selectProfileWatchStats" resultMap="WatchStatsResultMap">
+        SELECT video_id,
+               SUM(watched_seconds) AS total_seconds,
+               MAX(watch_time)      AS last_watch_time
+        FROM public.watch_history
+        WHERE is_delete = 0
+          AND user_id = #{userId}
+          AND watch_time &gt;= #{since}
+        GROUP BY video_id
+    </select>
+
+    <!-- 查询用户最近观看过的视频ID列表（每个视频仅保留最新观看的一条，供推荐排除已看视频） -->
+    <select id="selectWatchedVideoIds" resultType="long">
+        SELECT video_id
+        FROM (
+            SELECT DISTINCT ON (video_id) video_id, watch_time
+            FROM public.watch_history
+            WHERE is_delete = 0
+              AND user_id = #{userId}
+            ORDER BY video_id, watch_time DESC
+        ) t
+        ORDER BY t.watch_time DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

@@ -2,6 +2,8 @@ package com.cjym.videoweb.model.es;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 聚合搜索视频索引文档（video_search 索引）
  */
@@ -49,6 +51,9 @@ public class VideoDoc {
 
     /** 分类名称 */
     private String categoryName;
+
+    /** 视频标签（IK分词，供画像兴趣推荐匹配） */
+    private List<String> tags;
 
     /** UP主昵称 */
     private String nickName;

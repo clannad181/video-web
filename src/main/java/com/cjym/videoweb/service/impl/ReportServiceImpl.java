@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cjym.videoweb.annotation.NotifyMessage;
+import com.cjym.videoweb.constant.MessageConstant;
 import com.cjym.videoweb.constant.ReportConstant;
 import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.exception.GlobeException;
@@ -94,7 +96,8 @@ public class ReportServiceImpl extends ServiceImpl<ReportMapper, Report> impleme
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void handle(ReportHandleDto dto) {
+    @NotifyMessage(type = MessageConstant.TYPE_VIDEO_TAKEDOWN)
+    public Video handle(ReportHandleDto dto) {
         if (dto.getReportId() == null) {
             throw new GlobeException("举报ID不能为空");
         }
@@ -120,15 +123,17 @@ public class ReportServiceImpl extends ServiceImpl<ReportMapper, Report> impleme
         report.setHandlerNote(dto.getHandlerNote());
         report.setHandleTime(LocalDateTime.now());
         baseMapper.updateById(report);
-        // 确认违规（已受理）→ 已发布的视频下架（video_status=3）
+        // 确认违规（已受理）→ 已发布的视频下架（video_status=3），返回视频实体由 @NotifyMessage 切面异步通知 UP 主
         if (dto.getHandleResult() == ReportConstant.STATUS_ACCEPTED) {
             Video video = videoMapper.selectById(report.getVideoId());
             if (video != null && video.getVideoStatus() != null
                     && video.getVideoStatus() == VideoConstant.VIDEO_STATUS_PUBLISHED) {
                 video.setVideoStatus(3);  // 已下架
                 videoMapper.updateById(video);
+                return video;
             }
         }
+        return null;
     }
 
     /**

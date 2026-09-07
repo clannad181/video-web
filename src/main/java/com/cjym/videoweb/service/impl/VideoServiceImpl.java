@@ -5,13 +5,17 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cjym.videoweb.annotation.NotifyMessage;
+import com.cjym.videoweb.constant.BaseConstant;
+import com.cjym.videoweb.constant.MessageConstant;
+import com.cjym.videoweb.constant.UserProfileConstant;
+import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.mapper.UserInfoMapper;
-import com.cjym.videoweb.constant.BaseConstant;
-import com.cjym.videoweb.constant.VideoConstant;
+import com.cjym.videoweb.mapper.WatchHistoryMapper;
 import com.cjym.videoweb.model.dto.EpisodePageDto;
 import com.cjym.videoweb.model.dto.EpisodeUpdateDto;
 import com.cjym.videoweb.model.dto.VideoContributeDto;
@@ -21,6 +25,7 @@ import com.cjym.videoweb.model.dto.VideoEpisodeSaveDto;
 import com.cjym.videoweb.model.dto.VideoPageDto;
 import com.cjym.videoweb.model.dto.VideoSaveDto;
 import com.cjym.videoweb.model.entity.Follow;
+import com.cjym.videoweb.model.entity.UserProfile;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
 import com.cjym.videoweb.model.entity.UserInfo;
@@ -31,6 +36,7 @@ import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.DataCenterVo;
 import com.cjym.videoweb.model.vo.MonthlyContributionVo;
 import com.cjym.videoweb.model.vo.MyContributionVideoVo;
+import com.cjym.videoweb.model.vo.RecommendVo;
 import com.cjym.videoweb.model.vo.VideoEpisodeVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.VideoReviewStatsVo;
@@ -39,6 +45,7 @@ import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.CategoryService;
 import com.cjym.videoweb.service.CommentService;
 import com.cjym.videoweb.service.EsSearchService;
+import com.cjym.videoweb.service.UserProfileService;
 import com.cjym.videoweb.service.VideoService;
 import com.cjym.videoweb.service.WatchHistoryService;
 import com.cjym.videoweb.service.WebConfigService;
@@ -94,6 +101,12 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Resource
     private WatchHistoryService watchHistoryService;
+
+    @Resource
+    private WatchHistoryMapper watchHistoryMapper;
+
+    @Resource
+    private UserProfileService userProfileService;
 
     @Resource
     private CommentService commentService;
@@ -165,28 +178,95 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     }
 
     @Override
-    public List<ClientVideoVo> recommend() {
-        List<ClientVideoVo> result;
+    public RecommendVo recommend() {
+        RecommendVo result = new RecommendVo();
         Long currentUserId = getCurrentUserId();
-        if (currentUserId == null) {
-            // 未登录：返回最多收藏的视频
-            result = baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE, null);
-        } else {
-            // 已登录：返回所有关注UP主的最新视频（最多6条）
-            List<ClientVideoVo> follows = baseMapper.selectFollowLatest(currentUserId, BaseConstant.VIDEO_RECOMMEND_SIZE);
-            if (follows.size() < BaseConstant.VIDEO_RECOMMEND_SIZE) {
-                // 关注视频不足6条（含关注数为0）时用最多收藏的视频补齐（排除已推荐视频）
-                List<Long> excludeIds = follows.stream().map(ClientVideoVo::getId).collect(Collectors.toList());
-                List<ClientVideoVo> hot = baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE - follows.size(), excludeIds);
-                follows.addAll(hot);
-            }
-            result = follows;
-        }
-        // 填充当前用户是否已关注UP主的标记
-        fillFollowStatus(result);
-        // 填充播放跳转链接
-        fillPlayLink(result);
+        // Banner：已登录且有画像时按兴趣推荐（排除已观看），无画像或未登录时退回最多收藏的视频
+        List<ClientVideoVo> banner = buildBannerRecommend(currentUserId);
+        // 卡片：已登录取关注UP主最新视频，未登录取最新发布视频，均排除Banner已推荐并用热门补齐
+        List<Long> bannerIds = banner.stream().map(ClientVideoVo::getId).collect(Collectors.toList());
+        List<ClientVideoVo> cards = buildCardsRecommend(currentUserId, bannerIds);
+        result.setBanner(banner);
+        result.setCards(cards);
+        // 合并填充关注标记与播放跳转链接
+        List<ClientVideoVo> all = new ArrayList<>(banner.size() + cards.size());
+        all.addAll(banner);
+        all.addAll(cards);
+        fillFollowStatus(all);
+        fillPlayLink(all);
         return result;
+    }
+
+    /**
+     * Banner推荐：已登录且存在画像时按兴趣分类/标签匹配视频（搜索适配器路由，ES/数据库），
+     * 排除已观看视频，不足6条用最多收藏的视频补齐；未登录或无画像时返回最多收藏的视频
+     */
+    private List<ClientVideoVo> buildBannerRecommend(Long userId) {
+        if (userId == null) {
+            return baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE, null);
+        }
+        List<UserProfile> interests = userProfileService.listInterests(userId);
+        if (interests.isEmpty()) {
+            // 无画像：热门兑底
+            return baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE, null);
+        }
+        // 兴趣分类与标签（画像按得分降序，各取前N个控制查询规模）
+        List<Long> categoryIds = interests.stream()
+                .filter(p -> UserProfileConstant.ITEM_TYPE_CATEGORY.equals(p.getItemType()))
+                .map(UserProfile::getItemId)
+                .filter(Objects::nonNull)
+                .limit(BaseConstant.RECOMMEND_INTEREST_CATEGORY_LIMIT)
+                .collect(Collectors.toList());
+        List<String> tags = interests.stream()
+                .filter(p -> UserProfileConstant.ITEM_TYPE_TAG.equals(p.getItemType()))
+                .map(UserProfile::getItemName)
+                .filter(StringUtils::isNotEmpty)
+                .limit(BaseConstant.RECOMMEND_INTEREST_TAG_LIMIT)
+                .collect(Collectors.toList());
+        if (categoryIds.isEmpty() && tags.isEmpty()) {
+            // 画像维度均不可用：热门兑底
+            return baseMapper.selectFavoriteTop(BaseConstant.VIDEO_RECOMMEND_SIZE, null);
+        }
+        // 最近观看过的视频（排除已看，避免反复推荐）
+        List<Long> watchedIds = watchHistoryMapper.selectWatchedVideoIds(userId,
+                BaseConstant.RECOMMEND_WATCHED_EXCLUDE_LIMIT);
+        List<ClientVideoVo> matched = searchServiceFacade.recommendByInterests(
+                categoryIds, tags, watchedIds, BaseConstant.VIDEO_RECOMMEND_SIZE);
+        if (matched.size() < BaseConstant.VIDEO_RECOMMEND_SIZE) {
+            // 兴趣命中不足：用最多收藏的视频补齐（排除已推荐与已观看）
+            List<Long> excludeIds = new ArrayList<>(watchedIds);
+            matched.forEach(vo -> excludeIds.add(vo.getId()));
+            matched.addAll(baseMapper.selectFavoriteTop(
+                    BaseConstant.VIDEO_RECOMMEND_SIZE - matched.size(), excludeIds));
+        }
+        return matched;
+    }
+
+    /**
+     * 卡片推荐：已登录返回关注UP主的最新视频（排除Banner已推荐，不足时用最多收藏补齐），
+     * 未登录返回最新发布的视频（排除Banner已推荐）
+     */
+    private List<ClientVideoVo> buildCardsRecommend(Long userId, List<Long> excludeIds) {
+        List<ClientVideoVo> cards;
+        if (userId == null) {
+            cards = baseMapper.selectLatestTop(BaseConstant.VIDEO_RECOMMEND_SIZE, excludeIds);
+        } else {
+            // 多取几条关注视频，过滤与Banner重复的再截断，避免有效条数变少
+            List<ClientVideoVo> follows = baseMapper.selectFollowLatest(userId,
+                    BaseConstant.VIDEO_RECOMMEND_SIZE + excludeIds.size());
+            cards = follows.stream()
+                    .filter(vo -> !excludeIds.contains(vo.getId()))
+                    .limit(BaseConstant.VIDEO_RECOMMEND_SIZE)
+                    .collect(Collectors.toList());
+        }
+        if (cards.size() < BaseConstant.VIDEO_RECOMMEND_SIZE) {
+            // 不足6条：用最多收藏的视频补齐（排除Banner已推荐与卡片已推荐）
+            List<Long> fillExclude = new ArrayList<>(excludeIds);
+            cards.forEach(vo -> fillExclude.add(vo.getId()));
+            cards.addAll(baseMapper.selectFavoriteTop(
+                    BaseConstant.VIDEO_RECOMMEND_SIZE - cards.size(), fillExclude));
+        }
+        return cards;
     }
 
     @Override
@@ -391,6 +471,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @NotifyMessage(type = MessageConstant.TYPE_VIDEO_PUBLISHED)
     public Video add(VideoSaveDto dto) {
         if (dto.getTitle() == null || dto.getTitle().isBlank()) {
             throw new GlobeException("视频标题不能为空");
@@ -424,7 +505,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void update(VideoSaveDto dto) {
+    @NotifyMessage(type = MessageConstant.TYPE_VIDEO_PUBLISHED)
+    public Video update(VideoSaveDto dto) {
         if (dto.getId() == null) {
             throw new GlobeException("视频ID不能为空");
         }
@@ -447,6 +529,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         // 同步 ES 索引
         refreshVideoEs(existVideo.getId());
+        return existVideo;
     }
 
     @Override
@@ -527,7 +610,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                         // 提交的剧集id在库中不存在（已被删除），按异常处理而非新增，防止已删除剧集被重新插入
                         throw new GlobeException("剧集不存在或已被删除");
                     }
-                    if (!Boolean.TRUE.equals(video.getIsOngoing())) {
+                    if (!Objects.equals(video.getVideoStatus(), VideoConstant.VIDEO_STATUS_DRAFT) && !Boolean.TRUE.equals(video.getIsOngoing())) {
                         throw new GlobeException("已完结的视频不能添加新剧集");
                     }
                     // 新增剧集
@@ -547,7 +630,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     }
 
     @Override
-    public void updateReviewStatus(Long episodeId, Integer reviewStatus) {
+    @NotifyMessage(type = MessageConstant.TYPE_VIDEO_REVIEW)
+    public Video updateReviewStatus(Long episodeId, Integer reviewStatus) {
         if (episodeId == null) {
             throw new GlobeException("剧集ID不能为空");
         }
@@ -562,6 +646,11 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         videoEpisodeMapper.updateById(episode);
         // 同步 ES 索引（审核结果影响剧集是否可搜索）
         refreshVideoEs(episode.getVideoId());
+        // 审核通过/拒绝：返回所属视频实体，由 @NotifyMessage 切面异步通知 UP 主（重置为待审核不通知）
+        if (reviewStatus == VideoConstant.REVIEW_APPROVED || reviewStatus == VideoConstant.REVIEW_REJECTED) {
+            return baseMapper.selectById(episode.getVideoId());
+        }
+        return null;
     }
 
     @Override
@@ -698,6 +787,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @NotifyMessage(type = MessageConstant.TYPE_VIDEO_PUBLISHED)
     public Video contribute(VideoContributeDto dto) {
         if (dto.getTitle() == null || dto.getTitle().isBlank()) {
             throw new GlobeException("视频标题不能为空");
@@ -733,7 +823,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateContribution(VideoContributeDto dto) {
+    @NotifyMessage(type = MessageConstant.TYPE_VIDEO_PUBLISHED)
+    public Video updateContribution(VideoContributeDto dto) {
         if (StringUtils.isEmpty(dto.getVideoUid())) {
             throw new GlobeException("视频avid不能为空");
         }
@@ -755,15 +846,18 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         // 更新视频基本信息（userId、videoStatus 由后端控制）
         BeanUtils.copyProperties(dto, existVideo, "videoUid", "tags", "userId", "videoStatus");
         boolean autoReview = isAutoReviewEnabled();
-        existVideo.setVideoStatus(autoReview ? VideoConstant.VIDEO_STATUS_PENDING : VideoConstant.VIDEO_STATUS_PUBLISHED);
-        existVideo.setTags(tagsToStr(dto.getTags()));
-        baseMapper.updateById(existVideo);
         // 兼容剧集维护：请求携带剧集列表时按增量逻辑同步（变更剧集重置审核状态）
         if (dto.getEpisodes() != null) {
             syncEpisodes(existVideo, dto.getEpisodes());
         }
-        // 同步 ES 索引
-        refreshVideoEs(existVideo.getId());
+        existVideo.setVideoStatus(autoReview ? VideoConstant.VIDEO_STATUS_PENDING : VideoConstant.VIDEO_STATUS_PUBLISHED);
+        existVideo.setTags(tagsToStr(dto.getTags()));
+        baseMapper.updateById(existVideo);
+        if (!autoReview) {
+            // 同步 ES 索引
+            refreshVideoEs(existVideo.getId());
+        }
+        return existVideo;
     }
 
     @Override
@@ -1041,6 +1135,33 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         return result;
     }
 
+    @Override
+    public void saveDraft(VideoContributeDto dto) {
+        if (dto.getTitle() == null || dto.getTitle().isBlank()) {
+            throw new GlobeException("视频标题不能为空");
+        }
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new GlobeException("请先登录");
+        }
+        // 构建视频实体（身份从token解析，视频状态由后端控制）
+        Video video = new Video();
+        BeanUtils.copyProperties(dto, video, "videoUid", "tags", "userId", "videoStatus");
+        long snowflakeId = snowflakeIdGenerator.nextId();
+        video.setAvid(Base62Converter.toAvid(snowflakeId));
+        video.setUserId(currentUserId);
+        video.setTags(tagsToStr(dto.getTags()));
+        video.setVideoStatus(VideoConstant.VIDEO_STATUS_DRAFT);
+        save(video);
+        // 新增剧集（审核状态由免审配置决定）
+        if (dto.getEpisodes() != null) {
+            for (int i = 0; i < dto.getEpisodes().size(); i++) {
+                VideoEpisode ep = buildNewEpisode(video.getId(), dto.getEpisodes().get(i), i);
+                videoEpisodeMapper.insert(ep);
+            }
+        }
+    }
+
     /**
      * 视频变更后同步 ES 索引（ES 未装配或同步失败时静默忽略，不影响主流程）
      */
@@ -1101,6 +1222,32 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         return ep;
     }
 
+    /**
+     * 构建新剧集草稿（审核状态由免审配置决定，统计字段初始化为0）
+     *
+     * @param videoId   视频ID
+     * @param epDto     剧集DTO
+     * @param index     在列表中的索引（用于自动编号和排序）
+     */
+    private VideoEpisode buildNewEpisode(Long videoId, VideoEpisodeSaveDto epDto, int index) {
+        VideoEpisode ep = new VideoEpisode();
+        ep.setVideoId(videoId);
+        // 生成 Snowflake ID 并转为剧集 avid
+        long snowflakeId = snowflakeIdGenerator.nextId();
+        ep.setAvid(Base62Converter.toAvid(snowflakeId));
+        ep.setReviewStatus(0);
+        ep.setEpisodeNumber(epDto.getEpisodeNumber() != null ? epDto.getEpisodeNumber() : index + 1);
+        ep.setTitle(epDto.getTitle());
+        ep.setDuration(epDto.getDuration());
+        ep.setPlayUrl(epDto.getPlayUrl());
+        ep.setSort(epDto.getSort() != null ? epDto.getSort() : index);
+        ep.setPlayCount(0L);
+        ep.setFavoriteCount(0L);
+        ep.setLikeCount(0L);
+        ep.setCoinCount(0L);
+        ep.setViewerCount(0L);
+        return ep;
+    }
     /**
      * 根据已有剧集重新计算视频的总集数和总时长
      */

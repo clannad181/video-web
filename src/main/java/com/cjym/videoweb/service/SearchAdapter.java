@@ -5,6 +5,7 @@ import com.cjym.videoweb.model.vo.ClientVideoVo;
 import com.cjym.videoweb.model.vo.UpUserVo;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * 聚合搜索适配器接口（目标接口）：ES 与数据库两种搜索实现的统一入口。
@@ -32,4 +33,11 @@ public interface SearchAdapter {
      * 指定UP主投稿列表：仅该用户的已发布视频，按 latest（发布时间）/hot（播放量）倒序
      */
     IPage<ClientVideoVo> listUserVideos(Long userId, Integer page, Integer size, String sortType) throws IOException;
+
+    /**
+     * 按用户画像兴趣推荐：分类ID命中或标签有交集的已发布视频，排除已观看视频，
+     * 按相关度/热度倒序返回指定数量（首页Banner个性化推荐）
+     */
+    List<ClientVideoVo> recommendByInterests(List<Long> categoryIds, List<String> tags,
+                                             List<Long> excludeIds, int limit) throws IOException;
 }

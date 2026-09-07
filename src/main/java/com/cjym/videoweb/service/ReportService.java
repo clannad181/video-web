@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.cjym.videoweb.model.dto.ReportCreateDto;
 import com.cjym.videoweb.model.dto.ReportHandleDto;
 import com.cjym.videoweb.model.entity.Report;
+import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.vo.ReportVo;
 
 public interface ReportService extends IService<Report> {
@@ -24,6 +25,8 @@ public interface ReportService extends IService<Report> {
      * 管理端处理举报（复核）：
      * 已受理（确认违规）→ 举报状态=1 且视频下架（video_status=3）；
      * 已驳回（未违规）→ 举报状态=2，视频不变
+     *
+     * @return 受理下架的视频实体（供 @NotifyMessage 切面通知 UP 主），其余情况返回 null
      */
-    void handle(ReportHandleDto dto);
+    Video handle(ReportHandleDto dto);
 }

@@ -2,6 +2,7 @@ package com.cjym.videoweb.service.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
@@ -9,6 +10,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.MatchAllQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MatchQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.TermsQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.WildcardQuery;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.indices.AnalyzeResponse;
@@ -49,6 +51,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +76,7 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
     /** UP主索引名 */
     private static final String UP_INDEX = "up_search";
     /** 索引映射版本号（_meta.version）：分词映射变更时递增，触发启动自动重建 */
-    private static final String MAPPING_VERSION = "4";
+    private static final String MAPPING_VERSION = "5";
     /** 映射版本元数据键 */
     private static final String MAPPING_META_KEY = "version";
     /** IK 分词器：写入时最大粒度切分 */
@@ -218,6 +223,47 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
         return listVideoByQuery(page, size, sortType, query);
     }
 
+    @Override
+    public List<ClientVideoVo> recommendByInterests(List<Long> categoryIds, List<String> tags,
+                                                    List<Long> excludeIds, int limit) {
+        // should：分类ID命中（term 精确匹配）或标签有交集（IK分词 match，多标签 OR 匹配）
+        List<Query> shouldQueries = new ArrayList<>();
+        if (categoryIds != null && !categoryIds.isEmpty()) {
+            shouldQueries.add(TermsQuery.of(t -> t.field("categoryId")
+                    .terms(tf -> tf.value(categoryIds.stream().map(FieldValue::of).toList())))._toQuery());
+        }
+        if (tags != null && !tags.isEmpty()) {
+            shouldQueries.add(MatchQuery.of(mq -> mq.field("tags").query(String.join(" ", tags)))._toQuery());
+        }
+        if (shouldQueries.isEmpty()) {
+            return Collections.emptyList();
+        }
+        BoolQuery.Builder boolBuilder = new BoolQuery.Builder()
+                .should(shouldQueries)
+                .minimumShouldMatch("1");
+        // 排除已观看视频（文档 id 字段为视频id）
+        if (excludeIds != null && !excludeIds.isEmpty()) {
+            boolBuilder.mustNot(List.of(TermsQuery.of(t -> t.field("id")
+                    .terms(tf -> tf.value(excludeIds.stream().map(FieldValue::of).toList())))._toQuery()));
+        }
+        // 排序：相关度得分降序，收藏数兑底
+        SearchResponse<VideoDoc> response;
+        try {
+            response = client.search(s -> s
+                    .index(VIDEO_INDEX)
+                    .query(boolBuilder.build()._toQuery())
+                    .size(limit)
+                    .sort(List.of(SortOptions.of(so -> so.score(sc -> sc.order(SortOrder.Desc))),
+                            SortOptions.of(so -> so.field(f -> f.field("favoriteCount").order(SortOrder.Desc))))),
+                    VideoDoc.class);
+        } catch (IOException e) {
+            throw new RuntimeException("ES 兴趣推荐查询失败", e);
+        }
+        return response.hits().hits().stream()
+                .map(h -> toVideoVo(h.source()))
+                .collect(Collectors.toList());
+    }
+
     /**
      * 前台视频列表通用查询：按 latest（发布时间）/hot（播放量）倒序分页
      * （浏览场景无关键词匹配，无相关度得分，非法排序值降级发布时间）
@@ -318,6 +364,7 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
         doc.setUserId(video.getUserId());
         doc.setCategoryId(video.getCategoryId());
         doc.setCategoryName(categoryName);
+        doc.setTags(splitTags(video.getTags()));
         doc.setNickName(user != null ? user.getNikeName() : null);
         doc.setAvatarUrl(user != null ? user.getAvatar() : null);
         doc.setUid(user != null ? user.getUid() : null);
@@ -465,6 +512,19 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
     }
 
     /**
+     * 逗号分隔标签字符串 → 标签列表（去空白、去空项，供索引文档 tags 字段）
+     */
+    private List<String> splitTags(String tags) {
+        if (tags == null || tags.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(tags.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 索引文档（索引缺失时先按 IK 分词映射创建再写入）
      */
     private void indexDocument(String indexName, Long docId, Object doc) {
@@ -528,6 +588,7 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
                         .properties("userId", p -> p.long_(f -> f))
                         .properties("categoryId", p -> p.long_(f -> f))
                         .properties("categoryName", p -> p.keyword(k -> k))
+                        .properties("tags", p -> p.text(t -> t.analyzer(IK_ANALYZER).searchAnalyzer(IK_SEARCH_ANALYZER)))
                         .properties("nickName", p -> p.text(t -> t.analyzer(IK_ANALYZER).searchAnalyzer(IK_SEARCH_ANALYZER)))
                         .properties("avatarUrl", p -> p.keyword(k -> k))
                         .properties("uid", p -> p.keyword(k -> k))
@@ -616,6 +677,7 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
         doc.setUserId(vo.getUserId());
         doc.setCategoryId(vo.getCategoryId());
         doc.setCategoryName(vo.getCategoryName());
+        doc.setTags(splitTags(vo.getTags()));
         doc.setNickName(vo.getNickName());
         doc.setAvatarUrl(vo.getAvatarUrl());
         doc.setUid(vo.getUid());
@@ -686,6 +748,7 @@ public class EsSearchServiceImpl implements EsSearchService, ApplicationRunner {
         vo.setFavoriteCount(doc.getFavoriteCount());
         vo.setCategoryId(doc.getCategoryId());
         vo.setCategoryName(doc.getCategoryName());
+        vo.setTags(doc.getTags() == null || doc.getTags().isEmpty() ? null : String.join(",", doc.getTags()));
         vo.setNickName(doc.getNickName());
         vo.setUserId(doc.getUserId());
         vo.setAvatarUrl(doc.getAvatarUrl());

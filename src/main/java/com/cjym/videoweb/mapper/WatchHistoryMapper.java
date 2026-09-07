@@ -7,10 +7,12 @@ import com.cjym.videoweb.model.entity.WatchHistory;
 import com.cjym.videoweb.model.vo.DailyActiveVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.WatchHistoryVo;
+import com.cjym.videoweb.model.vo.WatchStatsVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -77,4 +79,20 @@ public interface WatchHistoryMapper extends BaseMapper<WatchHistory> {
      * 今日总播放量
      */
     Long selectTodayPlayCount();
+
+    /**
+     * 查询时间窗内有观看记录的用户ID列表（去重，供用户画像批量重建）
+     */
+    List<Long> selectProfileUserIds(@Param("since") LocalDateTime since);
+
+    /**
+     * 按视频聚合用户的观看统计（累计观看秒数与最近观看时间，供用户画像算法）
+     */
+    List<WatchStatsVo> selectProfileWatchStats(@Param("userId") Long userId,
+                                               @Param("since") LocalDateTime since);
+
+    /**
+     * 查询用户最近观看过的视频ID列表（每个视频仅保留最新观看的一条，供推荐排除已看视频）
+     */
+    List<Long> selectWatchedVideoIds(@Param("userId") Long userId, @Param("limit") int limit);
 }
