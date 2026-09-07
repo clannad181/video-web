@@ -113,6 +113,8 @@ public class BaseConstant {
     public static final String WEB_CONFIG_CATEGORY_SEARCH = "search";
     /** WebConfig 服务器监控分类 */
     public static final String WEB_CONFIG_CATEGORY_MONITOR = "monitor";
+    /** WebConfig 通知配置分类 */
+    public static final String WEB_CONFIG_CATEGORY_NOTIFICATION = "notification";
     /** WebConfig token 有效期分类 */
     public static final String WEB_CONFIG_CATEGORY_TOKEN_EXPIRY = "token_security";
     /** WebConfig 默认角色配置键 */
@@ -129,6 +131,12 @@ public class BaseConstant {
     public static final String MONITOR_MEMORY_THRESHOLD = "memory_threshold";
     /** WebConfig 服务器磁盘使用率告警阈值配置键（%） */
     public static final String MONITOR_DISK_THRESHOLD = "disk_threshold";
+    /** WebConfig 视频审核结果通知开关配置键（true-审核后发送通知，false-不发送） */
+    public static final String WEB_CONFIG_KEY_VIDEO_REVIEW_NOTIFY = "videoReviewNotify";
+    /** WebConfig 评论通知开关配置键（true-视频收到新评论时通知UP主，false-不发送） */
+    public static final String WEB_CONFIG_KEY_COMMENT_NOTIFY = "commentNotify";
+    /** WebConfig 举报处理结果通知开关配置键（true-举报处理完成后通知举报人，false-不发送） */
+    public static final String WEB_CONFIG_KEY_REPORT_NOTIFY = "reportNotify";
 
     // ==================== WebConfig 通用值常量 ====================
     /** WebConfig 布尔真值 */

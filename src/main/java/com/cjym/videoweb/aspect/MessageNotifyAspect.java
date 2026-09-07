@@ -1,6 +1,7 @@
 package com.cjym.videoweb.aspect;
 
 import com.cjym.videoweb.annotation.NotifyMessage;
+import com.cjym.videoweb.annotation.NotifyMessages;
 import com.cjym.videoweb.model.entity.MessageInfo;
 import com.cjym.videoweb.provider.CustomThreadPoolExecutorProvider;
 import com.cjym.videoweb.service.MessageService;
@@ -27,7 +28,7 @@ import java.util.Map;
 /**
  * 消息通知 AOP 切面
  * <p>
- * 拦截 {@code @NotifyMessage} 注解的方法，方法正常返回后：
+ * 拦截 {@code @NotifyMessage} 注解（可重复，容器为 {@code @NotifyMessages}）的方法，方法正常返回后对每个注解：
  * 1. 解析 target SpEL（默认 #result 返回值）得到消息数据来源对象；
  * 2. 交给 NotifyMessageAssembler 按消息类型组装为消息实体（同步阶段完成，避免跨线程访问事务/请求上下文）；
  * 3. 组装结果非空时，将消息落库 + WebSocket 推送提交线程池异步执行，不阻塞业务线程；
@@ -55,12 +56,29 @@ public class MessageNotifyAspect {
     private static final ParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
 
     /**
-     * 方法正常返回后处理：@AfterReturning 保证业务失败（抛异常）时不发通知
+     * 方法正常返回后处理：@AfterReturning 保证业务失败（抛异常）时不发通知。
+     * pointcut 同时匹配单注解与可重复注解的容器注解，统一从方法反射读取全部注解逐个处理。
      */
-    @AfterReturning(pointcut = "@annotation(notifyMessage)", returning = "result")
-    public void afterReturning(JoinPoint joinPoint, NotifyMessage notifyMessage, Object result) {
+    @AfterReturning(pointcut = "@annotation(com.cjym.videoweb.annotation.NotifyMessage) "
+            + "|| @annotation(com.cjym.videoweb.annotation.NotifyMessages)", returning = "result")
+    public void afterReturning(JoinPoint joinPoint, Object result) {
+        NotifyMessage[] annotations = ((MethodSignature) joinPoint.getSignature()).getMethod()
+                .getAnnotationsByType(NotifyMessage.class);
+        if (annotations.length == 0) {
+            return;
+        }
+        Map<String, Object> args = resolveArgs(joinPoint);
+        for (NotifyMessage notifyMessage : annotations) {
+            handleNotify(joinPoint, notifyMessage, result, args);
+        }
+    }
+
+    /**
+     * 处理单个 @NotifyMessage 注解：解析 SpEL → 组装消息快照 → 线程池异步落库与推送
+     */
+    private void handleNotify(JoinPoint joinPoint, NotifyMessage notifyMessage, Object result, Map<String, Object> args) {
         try {
-            EvaluationContext context = buildContext(joinPoint, result);
+            EvaluationContext context = buildContext(result, args);
             // 额外发送条件不满足时静默跳过
             if (StringUtils.isNotEmpty(notifyMessage.condition())
                     && !Boolean.TRUE.equals(SPEL_PARSER.parseExpression(notifyMessage.condition()).getValue(context))) {
@@ -68,7 +86,7 @@ public class MessageNotifyAspect {
             }
             // 解析消息数据来源对象并同步组装消息快照
             Object target = SPEL_PARSER.parseExpression(notifyMessage.target()).getValue(context);
-            MessageInfo message = notifyMessageAssembler.assemble(notifyMessage.type(), target, resolveArgs(joinPoint));
+            MessageInfo message = notifyMessageAssembler.assemble(notifyMessage.type(), target, args);
             if (message == null) {
                 return;
             }
@@ -81,18 +99,19 @@ public class MessageNotifyAspect {
                 }
             });
         } catch (Exception e) {
-            log.warn("消息通知注解解析失败，已跳过发送[method={}]", joinPoint.getSignature().toShortString(), e);
+            log.warn("消息通知注解解析失败，已跳过发送[method={}, type={}]",
+                    joinPoint.getSignature().toShortString(), notifyMessage.type(), e);
         }
     }
 
     /**
      * 构建 SpEL 上下文：注册 bean 解析器（支持 @beanName 引用）与 #参数名 / #result 变量
      */
-    private EvaluationContext buildContext(JoinPoint joinPoint, Object result) {
+    private EvaluationContext buildContext(Object result, Map<String, Object> args) {
         StandardEvaluationContext context = new StandardEvaluationContext();
         context.setBeanResolver(new BeanFactoryResolver(applicationContext));
         context.setVariable("result", result);
-        resolveArgs(joinPoint).forEach(context::setVariable);
+        args.forEach(context::setVariable);
         return context;
     }
 

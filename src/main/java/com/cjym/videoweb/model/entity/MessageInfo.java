@@ -22,7 +22,7 @@ public class MessageInfo {
     @Schema(description = "接收者用户ID")
     private Long userId;
 
-    @Schema(description = "消息类型：1-视频发布成功，2-稿件审核通知，3-举报下架通知，4-服务器状态通知")
+    @Schema(description = "消息类型：1-视频发布成功，2-稿件审核通知，3-举报下架通知，4-服务器状态通知，5-评论通知，6-举报处理结果通知")
     private Integer type;
 
     @Schema(description = "消息标题")

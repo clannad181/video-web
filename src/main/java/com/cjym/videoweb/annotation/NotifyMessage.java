@@ -12,10 +12,14 @@ import java.lang.annotation.*;
  * <p>
  * 切面按 type 将 target 对象交给消息组装器提取接收者与消息内容，再提交线程池异步落库与推送，
  * 不阻塞业务线程；通知链路任何异常仅记录日志，不影响业务主流程。
+ * <p>
+ * 注解可重复使用（@Repeatable），同一方法需要发送多类通知时（如举报受理同时通知 UP 主与举报人）
+ * 可声明多个 @NotifyMessage，切面按声明顺序逐个处理。
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
+@Repeatable(NotifyMessages.class)
 public @interface NotifyMessage {
 
     /**

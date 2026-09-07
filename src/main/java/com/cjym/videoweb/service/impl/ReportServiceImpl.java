@@ -97,6 +97,7 @@ public class ReportServiceImpl extends ServiceImpl<ReportMapper, Report> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     @NotifyMessage(type = MessageConstant.TYPE_VIDEO_TAKEDOWN)
+    @NotifyMessage(type = MessageConstant.TYPE_REPORT)
     public Video handle(ReportHandleDto dto) {
         if (dto.getReportId() == null) {
             throw new GlobeException("举报ID不能为空");

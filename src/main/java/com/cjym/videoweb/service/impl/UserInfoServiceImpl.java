@@ -399,6 +399,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         // 检查用户名是否已存在
         LambdaQueryWrapper<UserInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserInfo::getUserName, userAddVo.getUserName());
+        wrapper.eq(UserInfo::getType,userAddVo.getType());
         if (baseMapper.selectCount(wrapper) > 0) {
             return R.error("用户名已存在");
         }
@@ -416,7 +417,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         if (userInfo.getStatus() == null) {
             userInfo.setStatus(0);
         }
-        if(userInfo.getType()==BaseConstant.USER_TYPE_USER) {
+        if(Objects.equals(userInfo.getType(), BaseConstant.USER_TYPE_ADMIN)) {
             // 从web_config配置（Redis缓存优先）读取默认角色ID，未配置时回退常量默认值
             String defaultRoleValue = webConfigService.getConfigValue(
                     BaseConstant.WEB_CONFIG_CATEGORY_DEFAULT, BaseConstant.WEB_CONFIG_KEY_DEFAULT_ROLE);

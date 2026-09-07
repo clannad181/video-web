@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cjym.videoweb.annotation.NotifyMessage;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.CommentConstant;
+import com.cjym.videoweb.constant.MessageConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.CommentLikeMapper;
 import com.cjym.videoweb.mapper.CommentMapper;
@@ -113,6 +115,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @NotifyMessage(type = MessageConstant.TYPE_COMMENT)
     public CommentVo createClient(CommentClientSaveDto dto) {
         if (dto.getVideoUid() == null || dto.getVideoUid().isBlank()) {
             throw new GlobeException("视频avid不能为空");
@@ -335,6 +338,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     }
 
     @Override
+    @NotifyMessage(type = MessageConstant.TYPE_COMMENT)
     public void review(Long commentId, Integer reviewStatus) {
         if (commentId == null) {
             throw new GlobeException("评论ID不能为空");

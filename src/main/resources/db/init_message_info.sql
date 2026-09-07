@@ -19,7 +19,7 @@ COMMENT ON TABLE  public.message_info            IS '消息通知表';
 COMMENT ON COLUMN public.message_info.id          IS '主键id';
 COMMENT ON COLUMN public.message_info.avid        IS '消息唯一标识（av + Base62编码的雪花ID）';
 COMMENT ON COLUMN public.message_info.user_id     IS '接收者用户ID';
-COMMENT ON COLUMN public.message_info.type        IS '消息类型：1-视频发布成功，2-稿件审核通知，3-举报下架通知，4-服务器状态通知';
+COMMENT ON COLUMN public.message_info.type        IS '消息类型：1-视频发布成功，2-稿件审核通知，3-举报下架通知，4-服务器状态通知，5-评论通知，6-举报处理结果通知';
 COMMENT ON COLUMN public.message_info.title       IS '消息标题';
 COMMENT ON COLUMN public.message_info.content     IS '消息正文';
 COMMENT ON COLUMN public.message_info.biz_id      IS '关联业务ID（如视频ID）';

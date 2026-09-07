@@ -10,10 +10,14 @@ public class MessageConstant {
     public static final int TYPE_VIDEO_TAKEDOWN = 3;
     /** 消息类型：服务器运行状态通知 */
     public static final int TYPE_SERVER_STATUS = 4;
+    /** 消息类型：评论通知（视频收到新评论） */
+    public static final int TYPE_COMMENT = 5;
+    /** 消息类型：举报处理结果通知 */
+    public static final int TYPE_REPORT = 6;
     /** 消息类型最小值 */
     public static final int TYPE_MIN = TYPE_VIDEO_PUBLISHED;
     /** 消息类型最大值 */
-    public static final int TYPE_MAX = TYPE_SERVER_STATUS;
+    public static final int TYPE_MAX = TYPE_REPORT;
 
     /** 已读状态：未读 */
     public static final int READ_UNREAD = 0;
@@ -53,4 +57,14 @@ public class MessageConstant {
     public static final String TITLE_SERVER_STATUS = "服务器运行状态告警";
     /** 服务器状态告警-内容 */
     public static final String CONTENT_SERVER_STATUS = "服务器%s使用率 %.1f%% 超过阈值 %.1f%%，请及时关注处理";
+    /** 评论通知-标题 */
+    public static final String TITLE_COMMENT_NOTIFY = "收到新评论";
+    /** 评论通知-内容 */
+    public static final String CONTENT_COMMENT_NOTIFY = "您的视频《%s》收到了一条新评论，快去看看吧！";
+    /** 举报处理结果-标题 */
+    public static final String TITLE_REPORT_NOTIFY = "举报处理结果通知";
+    /** 举报处理结果-受理内容 */
+    public static final String CONTENT_REPORT_ACCEPTED = "您举报的视频《%s》经核实存在违规，已作下架处理";
+    /** 举报处理结果-驳回内容 */
+    public static final String CONTENT_REPORT_REJECTED = "您举报的视频《%s》经核实未发现违规，举报已驳回";
 }
