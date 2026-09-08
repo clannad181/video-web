@@ -840,9 +840,6 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (!currentUserId.equals(existVideo.getUserId())) {
             throw new GlobeException("无权编辑他人的视频");
         }
-        if (Objects.equals(existVideo.getVideoStatus(), VideoConstant.VIDEO_STATUS_PUBLISHED)) {
-            throw new GlobeException("已发布的视频不可编辑，请联系管理员");
-        }
         // 更新视频基本信息（userId、videoStatus 由后端控制）
         BeanUtils.copyProperties(dto, existVideo, "videoUid", "tags", "userId", "videoStatus");
         boolean autoReview = isAutoReviewEnabled();
@@ -1093,7 +1090,13 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (!Boolean.TRUE.equals(video.getIsOngoing())) {
             throw new GlobeException("已完结的视频不能删除剧集");
         }
+        // 删除前查询该视频下全部剧集：删除前剧集数大于1（删除后仍有剩余剧集）时，需重新编排剧集号保证连贯
+        List<VideoEpisode> episodesBeforeDelete = videoEpisodeMapper.selectList(new LambdaQueryWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getVideoId, video.getId()));
         videoEpisodeMapper.deleteById(episode.getId());
+        if (episodesBeforeDelete.size() > 1) {
+            renumberEpisodes(video.getId());
+        }
         // 重算视频的总集数和总时长
         recalculateVideoStats(video.getId());
         // 同步 ES 索引
@@ -1263,6 +1266,25 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                     .sum();
             video.setTotalDuration(totalDuration);
             baseMapper.updateById(video);
+        }
+    }
+
+    /**
+     * 按原排序（sort 升序，集数序号次之）重新编排视频下剩余剧集的集数序号（1,2,3...），
+     * 保证删除剧集后剧集号连贯；已正确的剧集跳过更新
+     */
+    private void renumberEpisodes(Long videoId) {
+        List<VideoEpisode> episodes = videoEpisodeMapper.selectList(new LambdaQueryWrapper<VideoEpisode>()
+                .eq(VideoEpisode::getVideoId, videoId)
+                .orderByAsc(VideoEpisode::getSort, VideoEpisode::getEpisodeNumber));
+        for (int i = 0; i < episodes.size(); i++) {
+            int expectedNumber = i + 1;
+            VideoEpisode ep = episodes.get(i);
+            if (ep.getEpisodeNumber() == null || ep.getEpisodeNumber() != expectedNumber) {
+                videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
+                        .eq(VideoEpisode::getId, ep.getId())
+                        .set(VideoEpisode::getEpisodeNumber, expectedNumber));
+            }
         }
     }
 

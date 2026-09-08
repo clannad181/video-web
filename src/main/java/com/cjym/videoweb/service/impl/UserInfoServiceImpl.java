@@ -27,6 +27,7 @@ import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
+import com.cjym.videoweb.model.vo.UserRegisterVo;
 import com.cjym.videoweb.model.vo.UserEpisodeStatsVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.CaptchaVo;
@@ -51,6 +52,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -112,7 +114,8 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     @Resource
     private ObjectProvider<EsSearchService> esSearchServiceProvider;
 
-    private static final String fromEmail="2657463589@qq.com";
+    @Value("${spring.mail.username}")
+    private static String fromEmail;
 
 
     /**
@@ -136,17 +139,27 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
         Pattern pattern = Pattern.compile(emailRegex);
         Matcher matcher = pattern.matcher(email);
-        if (matcher.matches()) {
-            // 邮箱格式正确，发送验证码
-            UserDto userDto = baseMapper.selectDtoByEmail(email);
-            if (ObjectUtils.isEmpty(userDto)) {
-                throw new GlobeException(ResultEnum.EMAIL_ERROR.getMessage());
+        if (StringUtils.isEmpty(email) || !matcher.matches()) {
+            throw new GlobeException(ResultEnum.EMAIL_ERROR.getMessage());
+        }
+        // 注册验证码：邮箱必须未被前台用户占用；登录验证码：邮箱必须已注册
+        if (CaptchaConstant.REGISTER_EMAIL_CAPTCHA.equals(captchaType)) {
+            UserDto frontUser = baseMapper.selectFrontDtoByEmail(email);
+            if (!ObjectUtils.isEmpty(frontUser)) {
+                throw new GlobeException("邮箱已被注册");
             }
-            emailSendService.send(fromEmail, email, fromEmail, "验证码", "【cjym】本次的验证码为：" + code + "\n在15分钟内有效,如非本人操作,请忽略此条邮件");
-            stringRedisTemplate.opsForValue().set(CaptchaConstant.ADMIN_EMAIL_CAPTCHA +captchaKey,code.toLowerCase(),5, TimeUnit.MINUTES);
+            emailSendService.send(fromEmail, email, fromEmail, "注册验证码", "【cjym】本次的注册验证码为：" + code + "\n在5分钟内有效,如非本人操作,请忽略此条邮件");
+            stringRedisTemplate.opsForValue().set(CaptchaConstant.REGISTER_EMAIL_CAPTCHA + captchaKey, code.toLowerCase(), 5, TimeUnit.MINUTES);
             return R.success(CaptchaVo.builder().key(captchaKey).build());
         }
-        throw new GlobeException(ResultEnum.EMAIL_ERROR.getMessage());
+        // 邮箱格式正确，发送验证码
+        UserDto userDto = baseMapper.selectDtoByEmail(email);
+        if (ObjectUtils.isEmpty(userDto)) {
+            throw new GlobeException(ResultEnum.EMAIL_ERROR.getMessage());
+        }
+        emailSendService.send(fromEmail, email, fromEmail, "验证码", "【cjym】本次的验证码为：" + code + "\n在15分钟内有效,如非本人操作,请忽略此条邮件");
+        stringRedisTemplate.opsForValue().set(CaptchaConstant.ADMIN_EMAIL_CAPTCHA + captchaKey, code.toLowerCase(), 5, TimeUnit.MINUTES);
+        return R.success(CaptchaVo.builder().key(captchaKey).build());
     }
 
     /**
@@ -200,6 +213,71 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                 tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
         saveRefreshToken(refreshToken,user.getId());
         return R.success(Map.of("accessToken",accessToken,"refreshToken",refreshToken));
+    }
+
+    /**
+     * 前台用户注册（邮箱验证码 + 用户名密码，注册用户类型固定为前台普通用户，成功后自动登录签发token）
+     * @param userRegisterVo 注册信息
+     * */
+    @Override
+    public R<Map<String,Object>> register(UserRegisterVo userRegisterVo) {
+        if (StringUtils.isEmpty(userRegisterVo.getUserName())) {
+            throw new GlobeException("用户名不能为空");
+        }
+        if (StringUtils.isEmpty(userRegisterVo.getPassword())) {
+            throw new GlobeException("密码不能为空");
+        }
+        if (StringUtils.isEmpty(userRegisterVo.getEmail())) {
+            throw new GlobeException(ResultEnum.EMAIL_NULL_ERROR.getMessage());
+        }
+        if (StringUtils.isEmpty(userRegisterVo.getKey()) || StringUtils.isEmpty(userRegisterVo.getCaptcha())) {
+            throw new GlobeException(ResultEnum.CODE_NULL_ERROR.getMessage());
+        }
+        // 校验注册邮箱验证码（一次性，校验后删除）
+        String captchaKey = CaptchaConstant.REGISTER_EMAIL_CAPTCHA + userRegisterVo.getKey();
+        String redisCaptcha = stringRedisTemplate.opsForValue().getAndDelete(captchaKey);
+        if (StringUtils.isEmpty(redisCaptcha) || !redisCaptcha.equalsIgnoreCase(userRegisterVo.getCaptcha().toLowerCase())) {
+            throw new GlobeException(ResultEnum.CAPTCHA_EXPIRE.getMessage());
+        }
+        // 校验用户名/邮箱在后台普通用户（type=0）范围内未被占用
+        LambdaQueryWrapper<UserInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserInfo::getType, BaseConstant.USER_TYPE_USER);
+        wrapper.and(w -> w.eq(UserInfo::getUserName, userRegisterVo.getUserName())
+                .or().eq(UserInfo::getEmail, userRegisterVo.getEmail()));
+        if (baseMapper.selectCount(wrapper) > 0) {
+            throw new GlobeException("用户名或邮箱已被注册");
+        }
+        // 构建用户实体
+        UserInfo userInfo = new UserInfo();
+        userInfo.setUserName(userRegisterVo.getUserName());
+        userInfo.setEmail(userRegisterVo.getEmail());
+        // 昵称未传时默认使用用户名
+        userInfo.setNikeName(StringUtils.isEmpty(userRegisterVo.getNikeName())
+                ? userRegisterVo.getUserName() : userRegisterVo.getNikeName());
+        // 生成16位随机数字uid
+        userInfo.setUid(generateUid());
+        // 生成盐值并加密密码
+        String salt = MD5Util.generateSalt();
+        userInfo.setSalt(salt);
+        userInfo.setPassword(MD5Util.md5WithSalt(userRegisterVo.getPassword(), salt));
+        // 前台普通用户：状态正常、默认前台角色
+        userInfo.setType(BaseConstant.USER_TYPE_USER);
+        userInfo.setStatus(0);
+        userInfo.setRoleId(BaseConstant.DEFAULT_FRONT_USER_ROLE_ID);
+        baseMapper.insert(userInfo);
+        // 同步 ES 索引
+        refreshUserEs(userInfo.getId());
+        // 注册成功后自动登录：按前台用户查询 UserDto（含角色权限）并签发 token
+        UserDto userDto = baseMapper.selectFrontDtoById(userInfo.getId());
+        String serverType = BaseConstant.SYS_FRONT;
+        String accessToken = JWTUtil.createAccessToken(userDto.getId(), serverType,
+                userDto.getUsername(), userDto.getAuthorities(),
+                tokenExpiryConfigService.getAccessTokenExpiry(serverType));
+        String refreshToken = JWTUtil.createRefreshToken(userDto.getId(), serverType,
+                userDto.getUsername(),
+                tokenExpiryConfigService.getRefreshTokenExpiry(serverType));
+        saveRefreshToken(refreshToken, userDto.getId());
+        return R.success(Map.of("accessToken", accessToken, "refreshToken", refreshToken));
     }
 
     /**
@@ -275,6 +353,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     @Override
     public R<ClientUserVo> getClientUserInfo(HttpServletRequest request) {
         String token = request.getHeader("authorization");
+        if(token==null){
+            throw new GlobeException(ResultEnum.TOKEN_ERROR.getMessage());
+        }
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }

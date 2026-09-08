@@ -7,6 +7,7 @@ import com.cjym.videoweb.model.dto.UserPageDto;
 import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserAddVo;
+import com.cjym.videoweb.model.vo.UserRegisterVo;
 import com.cjym.videoweb.model.vo.UserUpdateVo;
 import com.cjym.videoweb.model.vo.UserVo;
 import com.cjym.videoweb.model.entity.UserInfo;
@@ -33,6 +34,12 @@ public interface UserInfoService extends IService<UserInfo> {
      * @param userLoginVo 登录信息
      * */
     R<Map<String,Object>> login(UserLoginVo userLoginVo);
+
+    /**
+     * 前台用户注册（成功后自动登录并签发token）
+     * @param userRegisterVo 注册信息
+     * */
+    R<Map<String,Object>> register(UserRegisterVo userRegisterVo);
 
     /**
      * 获取用户信息（后台完整版，含角色和菜单树）

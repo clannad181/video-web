@@ -5,6 +5,7 @@ import com.cjym.videoweb.model.vo.CaptchaVo;
 import com.cjym.videoweb.model.vo.ClientUserVo;
 import com.cjym.videoweb.model.vo.UpUserVo;
 import com.cjym.videoweb.model.vo.UserLoginVo;
+import com.cjym.videoweb.model.vo.UserRegisterVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.UserInfoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,10 +29,16 @@ public class ClientUserController {
     private UserInfoService userInfoService;
 
     @GetMapping("/captcha")
-    @Operation(summary = "获取验证码", description = "获取前台登录验证码（邮箱验证码）")
+    @Operation(summary = "获取验证码", description = "获取前台邮箱验证码（captchaType=email_captcha 登录验证码，captchaType=register_email_captcha 注册验证码）")
     public R<CaptchaVo> getCaptcha(@RequestParam String captchaType,
                                    @RequestParam(required = false) String email) {
         return userInfoService.getCaptcha(captchaType, email);
+    }
+
+    @PostMapping("/register")
+    @Operation(summary = "前台用户注册", description = "前台用户注册（邮箱验证码校验，注册用户类型固定为前台普通用户，注册成功后自动登录并返回accessToken/refreshToken）")
+    public R<Map<String, Object>> register(@RequestBody UserRegisterVo userRegisterVo) {
+        return userInfoService.register(userRegisterVo);
     }
 
     @PostMapping("/login")
