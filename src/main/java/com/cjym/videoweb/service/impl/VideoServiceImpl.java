@@ -1139,6 +1139,11 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
     }
 
     @Override
+    public List<VideoPageDto> globalSearch(String keyword, int limit) {
+        return baseMapper.selectGlobalSearch(keyword, limit);
+    }
+
+    @Override
     public void saveDraft(VideoContributeDto dto) {
         if (dto.getTitle() == null || dto.getTitle().isBlank()) {
             throw new GlobeException("视频标题不能为空");

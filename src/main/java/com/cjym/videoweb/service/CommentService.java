@@ -6,11 +6,13 @@ import com.cjym.videoweb.model.dto.CommentClientSaveDto;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
 import com.cjym.videoweb.model.entity.Comment;
 import com.cjym.videoweb.model.entity.CommentLike;
+import com.cjym.videoweb.model.vo.CommentDetailVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -57,9 +59,14 @@ public interface CommentService extends IService<Comment> {
     CommentLike toggleLike(Long commentId);
 
     /**
-     * 运营屏蔽评论（软删 status=2）
+     * 运营屏蔽或恢复评论：屏蔽（status→2）时返回评论实体供 @NotifyMessage 切面通知 UP 主，恢复（status→0）时返回 null 不通知
      */
-    void deleteByAdmin(Long commentId);
+    Comment deleteByAdmin(Long commentId);
+
+    /**
+     * 管理端：查看评论详情，返回目标评论所属的完整评论树（含评论者昵称头像等人员信息，可见全部状态）
+     */
+    CommentDetailVo getDetail(Long commentId);
 
     /**
      * 管理端多条件分页查询评论列表
@@ -67,7 +74,7 @@ public interface CommentService extends IService<Comment> {
     IPage<CommentVo> pageAdminList(Integer page, Integer size,
                                     Long videoId, Integer status,
                                     String keyword, String nickName,
-                                    String startTime, String endTime);
+                                    LocalDateTime startTime, LocalDateTime endTime);
 
     /**
      * 评论状态统计：按 status 分组计数
@@ -89,4 +96,9 @@ public interface CommentService extends IService<Comment> {
      * 评论每日增量：按日期范围统计每天新增评论数（无数据的日期补0）
      */
     List<DailyIncrementVo> getDailyIncrement(LocalDate startDate, LocalDate endDate);
+
+    /**
+     * 管理端全局搜索评论：内容模糊匹配（含评论者昵称与视频标题），按创建时间倒序取前 limit 条
+     */
+    List<CommentVo> globalSearch(String keyword, int limit);
 }

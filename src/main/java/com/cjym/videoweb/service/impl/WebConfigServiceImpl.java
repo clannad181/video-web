@@ -75,7 +75,8 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
         if (StringUtils.isNotEmpty(cached)) {
             try {
                 List<WebConfigVo> voList = objectMapper.readValue(cached,
-                        new TypeReference<List<WebConfigVo>>() {});
+                        new TypeReference<List<WebConfigVo>>() {
+                        });
                 if (!voList.isEmpty()) {
                     return R.success(voList);
                 }
@@ -128,14 +129,14 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
         List<WebConfigVo> configList = null;
         if (StringUtils.isNotEmpty(cached)) {
             try {
-                configList = objectMapper.readValue(cached,
-                        new TypeReference<List<WebConfigVo>>() {});
+                configList = objectMapper.readValue(cached, new TypeReference<List<WebConfigVo>>() {});
                 if (configList.isEmpty()) {
                     // 缓存为空列表视为未命中，回源数据库（自愈残留空缓存）
                     configList = null;
                 }
             } catch (JsonProcessingException ignored) {
                 // 缓存数据异常，回源数据库
+                log.warn("缓存数据异常，回源数据库 category : {}, key : {}", category,key);
             }
         }
 

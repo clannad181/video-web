@@ -3,6 +3,7 @@ package com.cjym.videoweb.controller.admin;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cjym.videoweb.model.dto.CommentReviewDto;
 import com.cjym.videoweb.model.dto.CommentSaveDto;
+import com.cjym.videoweb.model.vo.CommentDetailVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
 import com.cjym.videoweb.result.R;
@@ -10,8 +11,10 @@ import com.cjym.videoweb.service.CommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -37,8 +40,8 @@ public class CommentController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String nickName,
-            @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         return R.success(commentService.pageAdminList(page, size, videoId, status, keyword, nickName, startTime, endTime));
     }
 
@@ -71,6 +74,12 @@ public class CommentController {
     public R<String> like(@PathVariable Long commentId) {
         var result = commentService.toggleLike(commentId);
         return R.success(result.getStatus() == 1 ? "点赞成功" : "已取消点赞");
+    }
+
+    @GetMapping("/detail/{commentId}")
+    @Operation(summary = "查看评论详情", description = "返回目标评论所属的完整评论树（含各层级评论者昵称头像与视频信息，管理端可见全部状态）")
+    public R<CommentDetailVo> detail(@PathVariable Long commentId) {
+        return R.success(commentService.getDetail(commentId));
     }
 
     @GetMapping("/admin-delete/{commentId}")

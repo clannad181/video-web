@@ -15,7 +15,7 @@
         <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
     </resultMap>
 
-    <!-- ==================== MenuDto 结果映射（含父菜单名称） ==================== -->
+    <!-- ==================== MenuDto 结果映射 ==================== -->
     <resultMap id="MenuDtoResultMap" type="com.cjym.videoweb.model.dto.MenuDto">
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="menu_name" property="menuName" jdbcType="VARCHAR"/>
@@ -24,7 +24,6 @@
         <result column="parent_id" property="parentId" jdbcType="BIGINT"/>
         <result column="desc_sort" property="descSort" jdbcType="INTEGER"/>
         <result column="icon" property="icon" jdbcType="VARCHAR"/>
-        <result column="parent_menu_name" property="parentMenuName" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="is_delete" property="isDelete" jdbcType="INTEGER"/>
     </resultMap>
@@ -42,15 +41,14 @@
           AND is_delete = 0
     </select>
 
-    <!-- ==================== 多条件分页查询（含父菜单名称） ==================== -->
+    <!-- ==================== 一级菜单多条件分页查询（子菜单不参与分页，由 Service 层组装） ==================== -->
     <select id="selectPageList" resultMap="MenuDtoResultMap">
         SELECT m.id, m.menu_name, m.menu_identification, m.status, m.parent_id, m.desc_sort, m.icon,
-               m.create_time, m.is_delete,
-               p.menu_name AS parent_menu_name
+               m.create_time, m.is_delete
         FROM public.menu m
-        LEFT JOIN public.menu p ON m.parent_id = p.id
         <where>
             m.is_delete = 0
+            AND (m.parent_id IS NULL OR m.parent_id = 0)
             <if test="menuName != null and menuName != ''">
                 AND m.menu_name LIKE CONCAT('%', #{menuName}, '%')
             </if>

@@ -49,4 +49,10 @@ public class UserPageDto {
     @Schema(description = "创建时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
+
+    @Schema(description = "性别")
+    private Boolean sex;
+
+    @Schema(description = "用户个性签名")
+    private String descript;
 }

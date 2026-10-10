@@ -319,6 +319,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                 MenuDto dto = new MenuDto();
                 dto.setId(m.getId());
                 dto.setMenuName(m.getMenuName());
+                dto.setPath(m.getPath());
                 dto.setMenuIdentification(m.getMenuIdentification());
                 dto.setStatus(m.getStatus());
                 dto.setParentId(m.getParentId());
@@ -326,7 +327,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                 dto.setIcon(m.getIcon());
                 dto.setCategory(m.getCategory());
                 return dto;
-            }).collect(Collectors.toList());
+            }).toList();
             // 建立 id → MenuDto 映射
             Map<Long, MenuDto> idMap = allDtos.stream()
                     .collect(Collectors.toMap(MenuDto::getId, d -> d));
@@ -447,10 +448,13 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     @Override
     public R<String> resetPassword(PasswordVo passwordVo) {
         Long userId = passwordVo.getUserId();
-        String username = passwordVo.getUsername();
+        Integer type=passwordVo.getType();
+        if(userId==null||type==null){
+            throw new GlobeException("参数错误，请检查用户ID和类型");
+        }
         LambdaQueryWrapper<UserInfo> lambdaQueryWrapper=new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(UserInfo::getId, userId);
-        lambdaQueryWrapper.eq(UserInfo::getUserName, username);
+        lambdaQueryWrapper.eq(UserInfo::getType, type);
         UserInfo userInfo = baseMapper.selectOne(lambdaQueryWrapper);
         if(ObjectUtils.isEmpty(userInfo)){
             throw new GlobeException("用户不存在");
@@ -610,6 +614,11 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     }
 
     @Override
+    public List<UserPageDto> globalSearch(String keyword, int limit) {
+        return baseMapper.selectGlobalSearch(keyword, limit);
+    }
+
+    @Override
     public UpUserVo getUpUserInfo(String userUid) {
         if (userUid == null || userUid.isBlank()) {
             throw new GlobeException("UP主uid不能为空");
@@ -641,6 +650,35 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
                 .eq(Follow::getUserId, currentUserId)
                 .eq(Follow::getFollowUserId, user.getId())) > 0);
         return vo;
+    }
+
+    @Override
+    public R<String> reset(PasswordVo passwordVo) {
+        Long userId = passwordVo.getUserId();
+        Integer type = passwordVo.getType();
+        if(userId == null || type == null){
+            return R.error("参数错误，请检查用户ID和类型");
+        }
+        LambdaQueryWrapper<UserInfo> lambdaQueryWrapper=new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(UserInfo::getId, userId);
+        lambdaQueryWrapper.eq(UserInfo::getType,type);
+        UserInfo userInfo = baseMapper.selectOne(lambdaQueryWrapper);
+        if(ObjectUtils.isEmpty(userInfo)){
+            throw new GlobeException("用户不存在");
+        }
+        String salt = MD5Util.generateSalt();
+        // 默认密码优先从 Redis 读取，未命中回源数据库查询（web_config 表 security 分类）
+        String defaultPassword = webConfigService.getConfigValue(
+                BaseConstant.WEB_CONFIG_CATEGORY_SECURITY, BaseConstant.WEB_CONFIG_KEY_DEFAULT_PASSWORD);
+        // 配置缺失时兜底使用默认密码，保证重置功能可用
+        if (StringUtils.isEmpty(defaultPassword)) {
+            defaultPassword = "123456";
+        }
+        String newPassword = MD5Util.md5WithSalt(defaultPassword, salt);
+        userInfo.setSalt(salt);
+        userInfo.setPassword(newPassword);
+        baseMapper.updateById(userInfo);
+        return R.success("密码重置成功");
     }
 
     /**

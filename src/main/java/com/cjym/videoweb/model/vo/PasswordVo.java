@@ -22,4 +22,7 @@ public class PasswordVo {
 
     @Schema(description = "验证码值")
     private String captcha;
+
+    @Schema(description = "用户类型")
+    private Integer type;
 }

@@ -9,11 +9,13 @@ import com.cjym.videoweb.constant.MessageConstant;
 import com.cjym.videoweb.constant.ReportConstant;
 import com.cjym.videoweb.constant.VideoConstant;
 import com.cjym.videoweb.exception.GlobeException;
+import com.cjym.videoweb.mapper.DictDataMapper;
 import com.cjym.videoweb.mapper.ReportMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
 import com.cjym.videoweb.mapper.VideoMapper;
 import com.cjym.videoweb.model.dto.ReportCreateDto;
 import com.cjym.videoweb.model.dto.ReportHandleDto;
+import com.cjym.videoweb.model.entity.DictData;
 import com.cjym.videoweb.model.entity.Report;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
@@ -39,14 +41,19 @@ public class ReportServiceImpl extends ServiceImpl<ReportMapper, Report> impleme
     @Resource
     private VideoEpisodeMapper videoEpisodeMapper;
 
+    @Resource
+    private DictDataMapper dictDataMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createClient(ReportCreateDto dto) {
         if (dto.getVideoUid() == null || dto.getVideoUid().isBlank()) {
             throw new GlobeException("视频avid不能为空");
         }
-        if (dto.getReportType() == null || dto.getReportType() < ReportConstant.TYPE_MIN
-                || dto.getReportType() > ReportConstant.TYPE_MAX) {
+        LambdaQueryWrapper<DictData> dictDataLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        dictDataLambdaQueryWrapper.eq(DictData::getValue, dto.getReportType().toString());
+        DictData dictData = dictDataMapper.selectOne(dictDataLambdaQueryWrapper);
+        if (dictData==null) {
             throw new GlobeException("举报类型无效");
         }
         Long currentUserId = getCurrentUserId();

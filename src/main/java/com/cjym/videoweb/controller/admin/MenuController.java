@@ -46,7 +46,7 @@ public class MenuController {
     }
 
     @GetMapping("/list")
-    @Operation(summary = "多条件分页查询菜单列表", description = "多条件分页查询菜单列表（含父菜单名称）")
+    @Operation(summary = "多条件分页查询菜单列表", description = "仅一级菜单参与分页（含菜单名称模糊搜索、状态筛选），子菜单组装在各一级菜单的children中")
     public R<IPage<MenuDto>> listMenus(@RequestParam(defaultValue = "1") Integer page,
                                        @RequestParam(defaultValue = "10") Integer size,
                                        @RequestParam(required = false) String menuName,

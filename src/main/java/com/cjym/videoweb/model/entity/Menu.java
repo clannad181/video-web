@@ -19,7 +19,10 @@ public class Menu {
     @Schema(description = "菜单名称")
     private String menuName;
 
-    @Schema(description = "菜单标识")
+    @Schema(description = "菜单路由")
+    private String path;
+
+    @Schema(description = "页面标识")
     private String menuIdentification;
 
     @Schema(description = "菜单状态")

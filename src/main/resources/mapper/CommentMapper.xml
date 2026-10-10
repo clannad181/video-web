@@ -128,14 +128,57 @@
             <if test="nickName != null and nickName != ''">
                 AND u.nike_name LIKE CONCAT('%', #{nickName}, '%')
             </if>
-            <if test="startTime != null and startTime != ''">
-                AND c.create_time &gt;= TO_TIMESTAMP(#{startTime}, 'YYYY-MM-DD HH24:MI:SS')
+            <if test="startTime != null">
+                AND c.create_time &gt;= #{startTime}
             </if>
-            <if test="endTime != null and endTime != ''">
-                AND c.create_time &lt;= TO_TIMESTAMP(#{endTime}, 'YYYY-MM-DD HH24:MI:SS')
+            <if test="endTime != null">
+                AND c.create_time &lt;= #{endTime}
             </if>
         </where>
         ORDER BY c.create_time DESC
+    </select>
+
+    <!-- 管理端全局搜索评论：内容模糊匹配（含评论者昵称与视频标题），按创建时间倒序取前 limit 条 -->
+    <select id="selectGlobalSearch" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               v.title AS video_title, v.cover_url AS video_cover,
+               FALSE AS liked
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        LEFT JOIN public.video_info v ON c.video_id = v.id
+        WHERE c.content LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY c.create_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 管理端：查询单条评论详情（任意状态） -->
+    <select id="selectAdminDetail" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.episode_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               v.title AS video_title, v.cover_url AS video_cover,
+               FALSE AS liked
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        LEFT JOIN public.video_info v ON c.video_id = v.id
+        WHERE c.id = #{id}
+    </select>
+
+    <!-- 管理端：查询某根评论的全部子回复（任意状态，用于详情树组装） -->
+    <select id="selectAllRepliesAdmin" resultMap="CommentVoResultMap">
+        SELECT c.id, c.video_id, c.episode_id, c.user_id, c.parent_id, c.root_id,
+               c.content, c.like_count, c.reply_count, c.status, c.create_time,
+               u.nike_name, u.avatar,
+               v.title AS video_title, v.cover_url AS video_cover,
+               FALSE AS liked
+        FROM public.comment c
+        LEFT JOIN public.user_info u ON c.user_id = u.id
+        LEFT JOIN public.video_info v ON c.video_id = v.id
+        WHERE c.root_id = #{rootId}
+          AND c.parent_id != 0
+        ORDER BY c.create_time ASC
     </select>
 
     <!-- 评论状态统计 -->

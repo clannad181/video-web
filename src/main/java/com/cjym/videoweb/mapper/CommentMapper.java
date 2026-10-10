@@ -12,6 +12,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -46,8 +47,18 @@ public interface CommentMapper extends BaseMapper<Comment> {
                                       @Param("status") Integer status,
                                       @Param("keyword") String keyword,
                                       @Param("nickName") String nickName,
-                                      @Param("startTime") String startTime,
-                                      @Param("endTime") String endTime);
+                                      @Param("startTime") LocalDateTime startTime,
+                                      @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * 管理端：查询单条评论详情（任意状态，JOIN 评论者与视频信息）
+     */
+    CommentVo selectAdminDetail(@Param("id") Long id);
+
+    /**
+     * 管理端：查询某根评论的全部子回复（任意状态，用于详情树组装）
+     */
+    List<CommentVo> selectAllRepliesAdmin(@Param("rootId") Long rootId);
 
     /**
      * 评论状态统计：按 status 分组计数
@@ -82,4 +93,10 @@ public interface CommentMapper extends BaseMapper<Comment> {
      * 批量统计剧集评论总数（前台可见口径：status != 2，按 episode_id 分组）
      */
     List<EpisodeCommentCountVo> selectEpisodeCommentCounts(@Param("episodeIds") List<Long> episodeIds);
+
+    /**
+     * 管理端全局搜索评论：内容模糊匹配（含评论者昵称与视频标题），按创建时间倒序取前 limit 条
+     */
+    List<CommentVo> selectGlobalSearch(@Param("keyword") String keyword,
+                                       @Param("limit") int limit);
 }

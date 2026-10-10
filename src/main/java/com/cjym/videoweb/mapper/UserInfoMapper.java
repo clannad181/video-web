@@ -75,4 +75,10 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
     IPage<UpUserVo> selectSearchUpPage(Page<UpUserVo> page,
                                        @Param("keyword") String keyword,
                                        @Param("orderColumn") String orderColumn);
+
+    /**
+     * 管理端全局搜索用户：昵称、用户名、邮箱或uid模糊匹配，按创建时间倒序取前 limit 条
+     */
+    List<UserPageDto> selectGlobalSearch(@Param("keyword") String keyword,
+                                         @Param("limit") int limit);
 }

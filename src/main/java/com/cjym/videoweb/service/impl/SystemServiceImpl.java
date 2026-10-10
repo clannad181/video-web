@@ -7,8 +7,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.lang.management.*;
-import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,8 +57,9 @@ public class SystemServiceImpl implements SystemService {
         vo.setJavaVendor(System.getProperty("java.vendor"));
         vo.setOsName(osBean.getName());
         vo.setOsArch(osBean.getArch());
-        vo.setJvmStartTime(LocalDateTime.now()
-                .minus(Duration.ofMillis(runtimeBean.getStartTime()))
+        vo.setJvmStartTime(LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(runtimeBean.getStartTime()),
+                ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         long uptimeMillis = runtimeBean.getUptime();
         vo.setJvmUptime(formatDuration(uptimeMillis));

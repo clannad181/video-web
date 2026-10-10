@@ -6,13 +6,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.MenuMapper;
+import com.cjym.videoweb.mapper.RoleMenuBindMapper;
 import com.cjym.videoweb.model.dto.MenuDto;
 import com.cjym.videoweb.model.entity.Menu;
+import com.cjym.videoweb.model.entity.RoleMenuBind;
 import com.cjym.videoweb.model.vo.MenuOptionVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.MenuService;
 import io.micrometer.common.util.StringUtils;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +25,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements MenuService {
+
+    @Resource
+    private RoleMenuBindMapper roleMenuBindMapper;
 
     @Override
     public R<String> addMenu(Menu menu) {
@@ -44,6 +51,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         return R.success("新增菜单成功");
     }
 
+    @Transactional
     @Override
     public R<String> updateMenu(Menu menu) {
         if (menu.getId() == null) {
@@ -73,6 +81,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
             if (baseMapper.selectCount(wrapper) > 0) {
                 return R.error("菜单名称已存在");
             }
+        }
+        if(!menu.getStatus()){
+            //删除用户绑定的该菜单
+            LambdaQueryWrapper<RoleMenuBind> bindWrapper=new  LambdaQueryWrapper<>();
+            bindWrapper.eq(RoleMenuBind::getMenuId, menu.getId());
+            roleMenuBindMapper.delete(bindWrapper);
         }
         baseMapper.updateById(menu);
         return R.success("修改菜单成功");
@@ -111,8 +125,46 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     @Override
     public R<IPage<MenuDto>> listMenus(Integer page, Integer size, String menuName, Boolean status) {
+        // 仅一级菜单参与分页
         Page<MenuDto> pageParam = new Page<>(page, size);
         IPage<MenuDto> result = baseMapper.selectPageList(pageParam, menuName, status);
+
+        List<MenuDto> roots = result.getRecords();
+        if (roots.isEmpty()) {
+            return R.success(result);
+        }
+
+        // 查询本页一级菜单下的所有子菜单
+        List<Long> parentIds = roots.stream().map(MenuDto::getId).collect(Collectors.toList());
+        LambdaQueryWrapper<Menu> childWrapper = new LambdaQueryWrapper<>();
+        childWrapper.in(Menu::getParentId, parentIds);
+        if (status != null) {
+            childWrapper.eq(Menu::getStatus, status);
+        }
+        childWrapper.orderByAsc(Menu::getDescSort, Menu::getId);
+        List<Menu> childMenus = baseMapper.selectList(childWrapper);
+
+        // 子菜单转换为 MenuDto 并按父菜单分组
+        Map<Long, List<MenuDto>> childrenMap = childMenus.stream().map(m -> {
+            MenuDto dto = new MenuDto();
+            dto.setId(m.getId());
+            dto.setMenuName(m.getMenuName());
+            dto.setMenuIdentification(m.getMenuIdentification());
+            dto.setStatus(m.getStatus());
+            dto.setParentId(m.getParentId());
+            dto.setDescSort(m.getDescSort());
+            dto.setIcon(m.getIcon());
+            dto.setCreateTime(m.getCreateTime());
+            dto.setIsDelete(m.getIsDelete());
+            return dto;
+        }).collect(Collectors.groupingBy(MenuDto::getParentId));
+
+        // 将子菜单组装到对应一级菜单的 children 中
+        for (MenuDto root : roots) {
+            List<MenuDto> children = childrenMap.getOrDefault(root.getId(), new ArrayList<>());
+            children.forEach(c -> c.setParentMenuName(root.getMenuName()));
+            root.setChildren(children);
+        }
         return R.success(result);
     }
 
@@ -163,6 +215,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     @Override
     public R<List<MenuOptionVo>> getMenuOptions() {
         LambdaQueryWrapper<Menu> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Menu::getStatus, true);
         wrapper.select(Menu::getId, Menu::getMenuName, Menu::getParentId, Menu::getIcon)
                .orderByAsc(Menu::getDescSort, Menu::getId);
         List<Menu> menus = baseMapper.selectList(wrapper);

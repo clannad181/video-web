@@ -20,6 +20,9 @@ public class MenuDto {
     @Schema(description = "菜单名称")
     private String menuName;
 
+    @Schema(description = "菜单路由")
+    private String path;
+
     @Schema(description = "菜单标识")
     private String menuIdentification;
 

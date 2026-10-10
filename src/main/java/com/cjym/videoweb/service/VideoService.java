@@ -200,5 +200,10 @@ public interface VideoService extends IService<Video> {
      */
     IPage<ClientVideoVo> pageSearchVideo(String keyword, Integer page, Integer size, String sortType);
 
+    /**
+     * 管理端全局搜索视频：标题或avid模糊匹配，按创建时间倒序取前 limit 条
+     */
+    List<VideoPageDto> globalSearch(String keyword, int limit);
+
     void saveDraft(VideoContributeDto dto);
 }

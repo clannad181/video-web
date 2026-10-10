@@ -117,8 +117,12 @@ public class BaseConstant {
     public static final String WEB_CONFIG_CATEGORY_NOTIFICATION = "notification";
     /** WebConfig token 有效期分类 */
     public static final String WEB_CONFIG_CATEGORY_TOKEN_EXPIRY = "token_security";
+    /** WebConfig 安全分类 */
+    public static final String WEB_CONFIG_CATEGORY_SECURITY = "security";
     /** WebConfig 默认角色配置键 */
     public static final String WEB_CONFIG_KEY_DEFAULT_ROLE = "default_role";
+    /** WebConfig 密码重置默认密码配置键 */
+    public static final String WEB_CONFIG_KEY_DEFAULT_PASSWORD = "default_password";
     /** WebConfig 视频免审配置键 */
     public static final String WEB_CONFIG_KEY_VIDEO_REVIEW = "video_review";
     /** WebConfig 评论免审配置键 */
@@ -141,4 +145,8 @@ public class BaseConstant {
     // ==================== WebConfig 通用值常量 ====================
     /** WebConfig 布尔真值 */
     public static final String WEB_CONFIG_VALUE_TRUE = "true";
+
+    // ==================== 字典 Redis 缓存 Key 常量 ====================
+    /** 字典数据 Redis 缓存 key 前缀（按类型编码缓存启用中的字典数据，完整 key 为 dict:list:{typeCode}） */
+    public static final String DICT_REDIS_KEY_PREFIX = "dict:list:";
 }

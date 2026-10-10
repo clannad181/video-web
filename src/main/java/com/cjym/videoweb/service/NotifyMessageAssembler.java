@@ -31,6 +31,7 @@ import java.util.Map;
  * - 视频发布成功 / 举报下架：target 为视频实体，直接提取 UP 主、标题、业务标识；
  * - 剧集审核：target 为所属视频实体，剧集ID与审核状态从方法参数中按类型提取；
  * - 评论通知：target 为评论 VO（发表场景）或从参数提取评论ID与审核状态（审核通过场景），通知视频 UP 主；
+ * - 评论被运营屏蔽：target 为被屏蔽的评论实体，通知视频 UP 主；
  * - 举报处理结果：从参数提取举报ID，通知举报人。
  * <p>
  * 组装失败（对象为空、接收者缺失、状态不满足、通知开关关闭）返回 null，切面将跳过发送。
@@ -68,6 +69,7 @@ public class NotifyMessageAssembler {
             case MessageConstant.TYPE_VIDEO_TAKEDOWN -> buildVideoTakedown(target);
             case MessageConstant.TYPE_COMMENT -> buildCommentNotify(target, args);
             case MessageConstant.TYPE_REPORT -> buildReportNotify(args);
+            case MessageConstant.TYPE_COMMENT_BLOCKED -> buildCommentBlockedNotify(target);
             default -> {
                 log.warn("未知消息类型，跳过发送[type={}]", type);
                 yield null;
@@ -205,6 +207,41 @@ public class NotifyMessageAssembler {
                 MessageConstant.TITLE_COMMENT_NOTIFY,
                 String.format(MessageConstant.CONTENT_COMMENT_NOTIFY, video.getTitle()),
                 commentId, video.getAvid());
+        message.setPlayLink(buildPlayLink(video, episode));
+        return message;
+    }
+
+    /**
+     * 评论被运营屏蔽：target 为被屏蔽的评论实体（方法仅在屏蔽时返回），通知视频 UP 主；
+     * 评论者为自己视频的评论被屏蔽不通知；playLink 指向评论所属剧集（视频级历史评论回退最新剧集）
+     */
+    private MessageInfo buildCommentBlockedNotify(Object target) {
+        if (!webConfigService.getConfigBoolean(BaseConstant.WEB_CONFIG_CATEGORY_NOTIFICATION,
+                BaseConstant.WEB_CONFIG_KEY_COMMENT_NOTIFY)) {
+            return null;
+        }
+        if (!(target instanceof Comment comment) || comment.getId() == null
+                || comment.getStatus() == null
+                || comment.getStatus() != CommentConstant.STATUS_ADMIN_BLOCKED) {
+            return null;
+        }
+        Video video = comment.getVideoId() != null ? videoMapper.selectById(comment.getVideoId()) : null;
+        if (video == null || video.getUserId() == null) {
+            return null;
+        }
+        // UP 主自己的评论被屏蔽不通知（与评论通知逻辑保持一致）
+        if (video.getUserId().equals(comment.getUserId())) {
+            return null;
+        }
+        // 视频级历史评论（无剧集归属）回退到最新剧集
+        VideoEpisode episode = comment.getEpisodeId() != null ? videoEpisodeMapper.selectById(comment.getEpisodeId()) : null;
+        if (episode == null) {
+            episode = findLatestEpisode(video.getId());
+        }
+        MessageInfo message = build(video.getUserId(), MessageConstant.TYPE_COMMENT_BLOCKED,
+                MessageConstant.TITLE_COMMENT_BLOCKED,
+                String.format(MessageConstant.CONTENT_COMMENT_BLOCKED, video.getTitle()),
+                comment.getId(), video.getAvid());
         message.setPlayLink(buildPlayLink(video, episode));
         return message;
     }

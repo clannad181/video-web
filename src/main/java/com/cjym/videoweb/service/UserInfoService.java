@@ -18,6 +18,7 @@ import com.cjym.videoweb.model.vo.UserStatsVo;
 import com.cjym.videoweb.result.R;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.List;
 import java.util.Map;
 
 public interface UserInfoService extends IService<UserInfo> {
@@ -110,8 +111,15 @@ public interface UserInfoService extends IService<UserInfo> {
     IPage<UpUserVo> pageSearchUp(String keyword, Integer page, Integer size, String sortType);
 
     /**
+     * 管理端全局搜索用户：昵称、用户名、邮箱或uid模糊匹配，按创建时间倒序取前 limit 条
+     */
+    List<UserPageDto> globalSearch(String keyword, int limit);
+
+    /**
      * 按uid获取指定UP主的公开信息：含昵称/头像/签名/性别/大会员/关注数/粉丝数/累计获赞/累计播放，
      * 及当前用户是否已关注（游客可访问，未登录时 isFollowed 为 false）
      */
     UpUserVo getUpUserInfo(String userUid);
+
+    R<String> reset(PasswordVo passwordVo);
 }

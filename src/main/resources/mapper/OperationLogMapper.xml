@@ -140,9 +140,10 @@
 
     <select id="selectHourlyActiveUsers" resultMap="HourlyActiveMap">
         SELECT TO_CHAR(date_trunc('hour', operation_time), 'HH24:MI') AS hour,
-               COUNT(DISTINCT user_id) AS "activeCount"
+               COUNT(DISTINCT ip_address) AS "activeCount"
         FROM public.operation_log
         WHERE is_delete = 0
+          AND system_type = 0
           AND operation_time &gt;= date_trunc('hour', NOW()) - INTERVAL '23 hours'
         GROUP BY date_trunc('hour', operation_time)
         ORDER BY date_trunc('hour', operation_time)

@@ -64,6 +64,12 @@ public class UserInfoController {
         return userInfoService.resetPassword(passwordVo);
     }
 
+    @PostMapping("/reset")
+    @Operation(summary = "重置密码", description = "重置密码")
+    public R<String> reset(@RequestBody PasswordVo passwordVo) {
+        return userInfoService.reset(passwordVo);
+    }
+
     @PostMapping("/add")
     @Operation(summary = "新增用户", description = "新增用户")
     public R<String> addUser(@RequestBody UserAddVo userAddVo) {

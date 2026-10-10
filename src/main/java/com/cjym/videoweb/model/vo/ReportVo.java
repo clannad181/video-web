@@ -22,6 +22,15 @@ public class ReportVo {
     @Schema(description = "被举报视频标题")
     private String videoTitle;
 
+    @Schema(description = "被举报视频封面图URL")
+    private String videoCover;
+
+    @Schema(description = "被举报视频状态：0-草稿，1-待发布，2-已发布，3-已下架")
+    private Integer videoStatus;
+
+    @Schema(description = "被举报视频UP主昵称")
+    private String upNickName;
+
     @Schema(description = "被举报剧集ID")
     private Long episodeId;
 
@@ -30,6 +39,15 @@ public class ReportVo {
 
     @Schema(description = "被举报剧集标题")
     private String episodeTitle;
+
+    @Schema(description = "被举报剧集集号")
+    private Integer episodeNumber;
+
+    @Schema(description = "被举报剧集时长（秒）")
+    private Long episodeDuration;
+
+    @Schema(description = "播放跳转链接：剧集级举报指向 /admin/video/{videoAvid}/episode/{episodeAvid}，视频级举报回退 /admin/video/{videoAvid}")
+    private String playLink;
 
     @Schema(description = "举报人用户ID")
     private Long reporterId;

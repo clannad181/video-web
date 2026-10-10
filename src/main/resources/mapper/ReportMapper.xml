@@ -7,9 +7,15 @@
         <result column="video_id" property="videoId" jdbcType="BIGINT"/>
         <result column="video_avid" property="videoAvid" jdbcType="VARCHAR"/>
         <result column="video_title" property="videoTitle" jdbcType="VARCHAR"/>
+        <result column="video_cover" property="videoCover" jdbcType="VARCHAR"/>
+        <result column="video_status" property="videoStatus" jdbcType="INTEGER"/>
+        <result column="up_nike_name" property="upNickName" jdbcType="VARCHAR"/>
         <result column="episode_id" property="episodeId" jdbcType="BIGINT"/>
         <result column="episode_avid" property="episodeAvid" jdbcType="VARCHAR"/>
         <result column="episode_title" property="episodeTitle" jdbcType="VARCHAR"/>
+        <result column="episode_number" property="episodeNumber" jdbcType="INTEGER"/>
+        <result column="episode_duration" property="episodeDuration" jdbcType="BIGINT"/>
+        <result column="play_link" property="playLink" jdbcType="VARCHAR"/>
         <result column="reporter_id" property="reporterId" jdbcType="BIGINT"/>
         <result column="reporter_nike_name" property="reporterNickName" jdbcType="VARCHAR"/>
         <result column="report_type" property="reportType" jdbcType="INTEGER"/>
@@ -26,12 +32,18 @@
     <select id="selectReportPage" resultMap="ReportVoResultMap">
         SELECT r.id, r.video_id, r.episode_id, r.reporter_id, r.report_type, r.reason,
                r.status, r.handler_id, r.handler_note, r.handle_time, r.create_time,
-               v.avid AS video_avid, v.title AS video_title,
-               e.avid AS episode_avid, e.title AS episode_title,
+               v.avid AS video_avid, v.title AS video_title, v.cover_url AS video_cover, v.video_status,
+               pu.nike_name AS up_nike_name,
+               e.avid AS episode_avid, e.title AS episode_title, e.episode_number, e.duration AS episode_duration,
+               CASE WHEN e.avid IS NOT NULL
+                    THEN CONCAT('/admin/video/', v.avid, '/episode/', e.avid)
+                    ELSE CONCAT('/admin/video/', v.avid)
+               END AS play_link,
                ru.nike_name AS reporter_nike_name,
                hu.nike_name AS handler_nike_name
         FROM public.report r
         LEFT JOIN public.video_info v ON v.id = r.video_id
+        LEFT JOIN public.user_info pu ON pu.id = v.user_id
         LEFT JOIN public.video_episode e ON e.id = r.episode_id
         LEFT JOIN public.user_info ru ON ru.id = r.reporter_id
         LEFT JOIN public.user_info hu ON hu.id = r.handler_id

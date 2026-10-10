@@ -14,10 +14,12 @@ public class MessageConstant {
     public static final int TYPE_COMMENT = 5;
     /** 消息类型：举报处理结果通知 */
     public static final int TYPE_REPORT = 6;
+    /** 消息类型：评论被运营屏蔽通知 */
+    public static final int TYPE_COMMENT_BLOCKED = 7;
     /** 消息类型最小值 */
     public static final int TYPE_MIN = TYPE_VIDEO_PUBLISHED;
     /** 消息类型最大值 */
-    public static final int TYPE_MAX = TYPE_REPORT;
+    public static final int TYPE_MAX = TYPE_COMMENT_BLOCKED;
 
     /** 已读状态：未读 */
     public static final int READ_UNREAD = 0;
@@ -67,4 +69,8 @@ public class MessageConstant {
     public static final String CONTENT_REPORT_ACCEPTED = "您举报的视频《%s》经核实存在违规，已作下架处理";
     /** 举报处理结果-驳回内容 */
     public static final String CONTENT_REPORT_REJECTED = "您举报的视频《%s》经核实未发现违规，举报已驳回";
+    /** 评论屏蔽通知-标题 */
+    public static final String TITLE_COMMENT_BLOCKED = "评论屏蔽通知";
+    /** 评论屏蔽通知-内容 */
+    public static final String CONTENT_COMMENT_BLOCKED = "您的视频《%s》下有一条评论因违规已被运营屏蔽";
 }

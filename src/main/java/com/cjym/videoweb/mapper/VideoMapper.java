@@ -55,6 +55,12 @@ public interface VideoMapper extends BaseMapper<Video> {
                                                @Param("orderColumn") String orderColumn);
 
     /**
+     * 管理端全局搜索视频：标题或avid模糊匹配，按创建时间倒序取前 limit 条
+     */
+    List<VideoPageDto> selectGlobalSearch(@Param("keyword") String keyword,
+                                          @Param("limit") int limit);
+
+    /**
      * 相关视频推荐第一步：查询候选视频id列表（同UP主或标签有交集，排除自身，仅已发布且至少有一集审核通过）
      */
     List<Long> selectRelatedVideoIds(@Param("videoId") Long videoId,

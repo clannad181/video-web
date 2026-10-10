@@ -21,6 +21,7 @@ import com.cjym.videoweb.model.entity.CommentLike;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.Video;
 import com.cjym.videoweb.model.entity.VideoEpisode;
+import com.cjym.videoweb.model.vo.CommentDetailVo;
 import com.cjym.videoweb.model.vo.DailyIncrementVo;
 import com.cjym.videoweb.model.vo.CommentStatusStatsVo;
 import com.cjym.videoweb.model.vo.CommentVo;
@@ -38,11 +39,14 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements CommentService {
@@ -307,20 +311,100 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     }
 
     @Override
-    public void deleteByAdmin(Long commentId) {
+    @NotifyMessage(type = MessageConstant.TYPE_COMMENT_BLOCKED)
+    public Comment deleteByAdmin(Long commentId) {
         Comment comment = baseMapper.selectById(commentId);
         if (comment == null) {
             throw new GlobeException("评论不存在");
         }
-        comment.setStatus(comment.getStatus()==CommentConstant.STATUS_NORMAL?CommentConstant.STATUS_ADMIN_BLOCKED:CommentConstant.STATUS_NORMAL);
+        boolean blocked = comment.getStatus() != CommentConstant.STATUS_ADMIN_BLOCKED;
+        comment.setStatus(blocked ? CommentConstant.STATUS_ADMIN_BLOCKED : CommentConstant.STATUS_NORMAL);
         baseMapper.updateById(comment);
+        // 仅屏蔽时返回评论实体，由 @NotifyMessage 切面异步通知视频 UP 主（恢复时不通知）
+        return blocked ? comment : null;
+    }
+
+    @Override
+    public CommentDetailVo getDetail(Long commentId) {
+        if (commentId == null) {
+            throw new GlobeException("评论ID不能为空");
+        }
+        Comment comment = baseMapper.selectById(commentId);
+        if (comment == null) {
+            throw new GlobeException("评论不存在");
+        }
+        // 定位根评论：一级评论自身为根，子回复向上取 rootId
+        Long rootId = comment.getRootId() != null && comment.getRootId() != 0 ? comment.getRootId() : comment.getId();
+        CommentVo rootComment = baseMapper.selectAdminDetail(rootId);
+        if (rootComment == null) {
+            throw new GlobeException("根评论不存在");
+        }
+        // 只返回与目标评论相关的树：沿根→目标仅保留祖先链路径，目标节点下挂完整回复子树，不返回父级同级兄弟分支
+        List<CommentVo> replies = baseMapper.selectAllRepliesAdmin(rootId);
+        if (!replies.isEmpty()) {
+            Map<Long, List<CommentVo>> childrenMap = replies.stream()
+                    .collect(Collectors.groupingBy(CommentVo::getParentId, LinkedHashMap::new, Collectors.toList()));
+            if (commentId.equals(rootId)) {
+                // 目标即根评论：挂完整回复子树
+                attachReplyTree(rootComment, childrenMap);
+            } else {
+                // 目标为子回复：沿祖先链挂载路径树
+                attachPathTree(rootComment, childrenMap, buildAncestorIds(commentId, replies), commentId);
+            }
+        }
+        CommentDetailVo vo = new CommentDetailVo();
+        vo.setTargetId(commentId);
+        vo.setRootComment(rootComment);
+        return vo;
+    }
+
+    /**
+     * 收集目标评论的祖先 id 集合：从目标开始逐级向上追溯父评论（不含目标自身与根评论）
+     */
+    private Set<Long> buildAncestorIds(Long targetId, List<CommentVo> replies) {
+        Map<Long, CommentVo> replyMap = replies.stream()
+                .collect(Collectors.toMap(CommentVo::getId, v -> v));
+        Set<Long> pathIds = new HashSet<>();
+        CommentVo cursor = replyMap.get(targetId);
+        while (cursor != null && cursor.getParentId() != null && cursor.getParentId() != 0) {
+            CommentVo parent = replyMap.get(cursor.getParentId());
+            if (parent == null) {
+                break;
+            }
+            pathIds.add(parent.getId());
+            cursor = parent;
+        }
+        return pathIds;
+    }
+
+    /**
+     * 沿根→目标路径挂载评论树：每层仅保留路径上的唯一节点，目标节点挂完整回复子树
+     */
+    private void attachPathTree(CommentVo node, Map<Long, List<CommentVo>> childrenMap, Set<Long> pathIds, Long targetId) {
+        if (node.getId().equals(targetId)) {
+            attachReplyTree(node, childrenMap);
+            return;
+        }
+        List<CommentVo> children = childrenMap.get(node.getId());
+        if (children == null) {
+            return;
+        }
+        CommentVo next = children.stream()
+                .filter(child -> child.getId().equals(targetId) || pathIds.contains(child.getId()))
+                .findFirst()
+                .orElse(null);
+        if (next == null) {
+            return;
+        }
+        node.setReplies(Collections.singletonList(next));
+        attachPathTree(next, childrenMap, pathIds, targetId);
     }
 
     @Override
     public IPage<CommentVo> pageAdminList(Integer page, Integer size,
                                            Long videoId, Integer status,
                                            String keyword, String nickName,
-                                           String startTime, String endTime) {
+                                           LocalDateTime startTime, LocalDateTime endTime) {
         Page<CommentVo> pageParam = new Page<>(page, size);
         return baseMapper.selectAdminList(pageParam, videoId, status, keyword, nickName, startTime, endTime);
     }
@@ -374,6 +458,11 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             result.add(vo);
         }
         return result;
+    }
+
+    @Override
+    public List<CommentVo> globalSearch(String keyword, int limit) {
+        return baseMapper.selectGlobalSearch(keyword, limit);
     }
 
     // ==================== 私有方法 ====================
