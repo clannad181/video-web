@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.DictDataMapper">
+
+    <resultMap id="DictDataPageDtoResultMap" type="com.cjym.videoweb.model.dto.DictDataPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="type_code" property="typeCode" jdbcType="VARCHAR"/>
+        <result column="label" property="label" jdbcType="VARCHAR"/>
+        <result column="value" property="value" jdbcType="VARCHAR"/>
+        <result column="sort" property="sort" jdbcType="INTEGER"/>
+        <result column="is_default" property="isDefault" jdbcType="BOOLEAN"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="selectDictDataPage" resultMap="DictDataPageDtoResultMap">
+        SELECT id, type_code, label, value, sort, is_default, remark, status, create_time, update_time
+        FROM public.dict_data
+        <where>
+            is_delete = 0
+            <if test="typeCode != null and typeCode != ''">
+                AND type_code = #{typeCode}
+            </if>
+            <if test="label != null and label != ''">
+                AND label LIKE CONCAT('%', #{label}, '%')
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+        <choose>
+            <when test="orderColumn != null and orderColumn != '' and orderDirection != null and orderDirection != ''">
+                ORDER BY ${orderColumn} ${orderDirection}
+            </when>
+            <otherwise>
+                ORDER BY sort ASC, id ASC
+            </otherwise>
+        </choose>
+    </select>
+
+</mapper>

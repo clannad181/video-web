@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.DictTypeMapper">
+
+    <resultMap id="DictTypePageDtoResultMap" type="com.cjym.videoweb.model.dto.DictTypePageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="type_code" property="typeCode" jdbcType="VARCHAR"/>
+        <result column="type_name" property="typeName" jdbcType="VARCHAR"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="is_system" property="isSystem" jdbcType="BOOLEAN"/>
+        <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="data_count" property="dataCount" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="selectDictTypePage" resultMap="DictTypePageDtoResultMap">
+        SELECT t.id, t.type_code, t.type_name, t.remark, t.is_system, t.status,
+               t.create_time, t.update_time,
+               (SELECT COUNT(*) FROM public.dict_data d
+                WHERE d.type_code = t.type_code AND d.is_delete = 0) AS data_count
+        FROM public.dict_type t
+        <where>
+            t.is_delete = 0
+            <if test="typeCode != null and typeCode != ''">
+                AND t.type_code LIKE CONCAT('%', #{typeCode}, '%')
+            </if>
+            <if test="typeName != null and typeName != ''">
+                AND t.type_name LIKE CONCAT('%', #{typeName}, '%')
+            </if>
+            <if test="status != null">
+                AND t.status = #{status}
+            </if>
+        </where>
+        <choose>
+            <when test="orderColumn != null and orderColumn != '' and orderDirection != null and orderDirection != ''">
+                ORDER BY t.${orderColumn} ${orderDirection}
+            </when>
+            <otherwise>
+                ORDER BY t.id ASC
+            </otherwise>
+        </choose>
+    </select>
+
+</mapper>
