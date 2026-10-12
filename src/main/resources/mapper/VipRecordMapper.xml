@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.VipRecordMapper">
+
+    <!-- ==================== 记录列表/详情结果映射（含用户信息） ==================== -->
+    <resultMap id="RecordPageResultMap" type="com.cjym.videoweb.model.dto.VipRecordPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="user_uid" property="userUid" jdbcType="VARCHAR"/>
+        <result column="user_name" property="userName" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nikeName" jdbcType="VARCHAR"/>
+        <result column="avatar" property="avatar" jdbcType="VARCHAR"/>
+        <result column="duration_months" property="durationMonths" jdbcType="INTEGER"/>
+        <result column="expire_time" property="expireTime" jdbcType="TIMESTAMP"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="create_user" property="createUser" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- ==================== 通用字段列表 ==================== -->
+    <sql id="RecordColumnList">
+        vr.id, vr.user_id, vr.duration_months, vr.expire_time, vr.status, vr.remark,
+        vr.create_user, vr.create_time, vr.update_time,
+        u.uid AS user_uid, u.user_name, u.nike_name, u.avatar
+    </sql>
+
+    <!-- 大会员开通记录分页查询（关联用户信息，按用户uid/用户名模糊、状态筛选） -->
+    <select id="selectRecordPage" resultMap="RecordPageResultMap">
+        SELECT <include refid="RecordColumnList"/>
+        FROM public.vip_record vr
+        LEFT JOIN public.user_info u ON vr.user_id = u.id
+        <where>
+            vr.is_delete = 0
+            <if test="userUid != null and userUid != ''">
+                AND u.uid LIKE CONCAT('%', #{userUid}, '%')
+            </if>
+            <if test="userName != null and userName != ''">
+                AND u.user_name LIKE CONCAT('%', #{userName}, '%')
+            </if>
+            <if test="status != null">
+                AND vr.status = #{status}
+            </if>
+        </where>
+        ORDER BY vr.create_time DESC
+    </select>
+
+    <!-- 按记录ID查询详情（关联用户信息） -->
+    <select id="selectDetailById" resultMap="RecordPageResultMap">
+        SELECT <include refid="RecordColumnList"/>
+        FROM public.vip_record vr
+        LEFT JOIN public.user_info u ON vr.user_id = u.id
+        WHERE vr.id = #{id,jdbcType=BIGINT}
+          AND vr.is_delete = 0
+    </select>
+
+</mapper>

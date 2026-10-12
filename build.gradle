@@ -65,6 +65,9 @@ dependencies {
     implementation 'com.baomidou:mybatis-plus-generator:3.5.10.1'
     implementation 'org.apache.velocity:velocity-engine-core:2.3'
 
+    // 支付宝开放平台 Java SDK（支付）
+    implementation 'com.alipay.sdk:alipay-sdk-java:4.38.157.ALL'
+
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

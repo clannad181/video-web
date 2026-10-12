@@ -63,6 +63,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.*;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -367,6 +368,11 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
         ClientUserVo vo = new ClientUserVo();
         BeanUtils.copyProperties(userInfo, vo);
+        // 大会员到期时间：仅当前有效时返回，非大会员或已过期时置空（与大会员状态接口口径一致）
+        if (Boolean.FALSE.equals(userInfo.getIsVip()) || userInfo.getVipExpireTime() == null
+                || !userInfo.getVipExpireTime().isAfter(LocalDateTime.now())) {
+            vo.setVipExpireTime(null);
+        }
         // 统计关注数与粉丝数（@TableLogic 自动过滤已取关记录）
         Long followCount = followMapper.selectCount(new LambdaQueryWrapper<Follow>()
                 .eq(Follow::getUserId, userInfo.getId()));

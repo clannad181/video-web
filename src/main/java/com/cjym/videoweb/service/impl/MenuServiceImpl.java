@@ -1,6 +1,7 @@
 package com.cjym.videoweb.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -61,12 +62,16 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         if (existMenu == null) {
             return R.error("菜单不存在");
         }
+        // 菜单名称必填（前端提交完整表单，null 会被清空，名称不允许为空）
+        if (StringUtils.isEmpty(menu.getMenuName())) {
+            return R.error("菜单名称不能为空");
+        }
         // 不能将父菜单设为自己
         if (menu.getParentId() != null && menu.getParentId().equals(menu.getId())) {
             return R.error("父菜单不能为自己");
         }
         // 如果修改了父菜单，校验父菜单是否存在
-        if (menu.getParentId() != null && menu.getParentId() != 0
+        if (menu.getParentId() != null && !Long.valueOf(0).equals(menu.getParentId())
                 && !menu.getParentId().equals(existMenu.getParentId())) {
             Menu parentMenu = baseMapper.selectById(menu.getParentId());
             if (parentMenu == null) {
@@ -74,21 +79,32 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
             }
         }
         // 检查菜单名称是否与其他菜单重复
-        if (StringUtils.isNotEmpty(menu.getMenuName())
-                && !menu.getMenuName().equals(existMenu.getMenuName())) {
+        if (!menu.getMenuName().equals(existMenu.getMenuName())) {
             LambdaQueryWrapper<Menu> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(Menu::getMenuName, menu.getMenuName());
             if (baseMapper.selectCount(wrapper) > 0) {
                 return R.error("菜单名称已存在");
             }
         }
-        if(!menu.getStatus()){
-            //删除用户绑定的该菜单
-            LambdaQueryWrapper<RoleMenuBind> bindWrapper=new  LambdaQueryWrapper<>();
+        // 禁用菜单时删除角色绑定的该菜单（仅启用→禁用时处理，避免重复删除）
+        if (Boolean.FALSE.equals(menu.getStatus()) && Boolean.TRUE.equals(existMenu.getStatus())) {
+            LambdaQueryWrapper<RoleMenuBind> bindWrapper = new LambdaQueryWrapper<>();
             bindWrapper.eq(RoleMenuBind::getMenuId, menu.getId());
             roleMenuBindMapper.delete(bindWrapper);
         }
-        baseMapper.updateById(menu);
+        // 逐字段组装更新：前端传 null 的字段显式清空（如父菜单置为顶级）；status 未传时保持原值
+        LambdaUpdateWrapper<Menu> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Menu::getId, menu.getId())
+                .set(Menu::getMenuName, menu.getMenuName())
+                .set(Menu::getMenuIdentification, menu.getMenuIdentification())
+                .set(Menu::getParentId, menu.getParentId())
+                .set(Menu::getDescSort, menu.getDescSort())
+                .set(Menu::getIcon, menu.getIcon())
+                .set(Menu::getCategory, menu.getCategory());
+        if (menu.getStatus() != null) {
+            updateWrapper.set(Menu::getStatus, menu.getStatus());
+        }
+        baseMapper.update(null, updateWrapper);
         return R.success("修改菜单成功");
     }
 

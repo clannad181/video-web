@@ -28,6 +28,10 @@ public class ClientUserVo {
     @Schema(description = "是否为大会员")
     private Boolean isVip;
 
+    @Schema(description = "大会员到期时间（非大会员或已过期时为 null）")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime vipExpireTime;
+
     @Schema(description = "用户昵称")
     private String nikeName;
 

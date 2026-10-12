@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.OrderInfoMapper">
+
+    <!-- ==================== 订单列表/详情结果映射（含用户信息） ==================== -->
+    <resultMap id="OrderPageResultMap" type="com.cjym.videoweb.model.dto.OrderPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="order_no" property="orderNo" jdbcType="VARCHAR"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="user_uid" property="userUid" jdbcType="VARCHAR"/>
+        <result column="user_name" property="userName" jdbcType="VARCHAR"/>
+        <result column="nike_name" property="nikeName" jdbcType="VARCHAR"/>
+        <result column="biz_type" property="bizType" jdbcType="INTEGER"/>
+        <result column="amount" property="amount" jdbcType="DECIMAL"/>
+        <result column="duration_months" property="durationMonths" jdbcType="INTEGER"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="pay_method" property="payMethod" jdbcType="INTEGER"/>
+        <result column="pay_time" property="payTime" jdbcType="TIMESTAMP"/>
+        <result column="expire_time" property="expireTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- ==================== 通用字段列表 ==================== -->
+    <sql id="OrderColumnList">
+        o.id, o.order_no, o.user_id, o.biz_type, o.amount, o.duration_months, o.status,
+        o.pay_method, o.pay_time, o.expire_time, o.remark, o.create_time,
+        u.uid AS user_uid, u.user_name, u.nike_name
+    </sql>
+
+    <!-- 订单分页查询（关联用户信息，userId 传值时仅查该用户订单） -->
+    <select id="selectOrderPage" resultMap="OrderPageResultMap">
+        SELECT <include refid="OrderColumnList"/>
+        FROM public.order_info o
+        LEFT JOIN public.user_info u ON o.user_id = u.id
+        <where>
+            o.is_delete = 0
+            <if test="userId != null">
+                AND o.user_id = #{userId}
+            </if>
+            <if test="userUid != null and userUid != ''">
+                AND u.uid LIKE CONCAT('%', #{userUid}, '%')
+            </if>
+            <if test="orderNo != null and orderNo != ''">
+                AND o.order_no LIKE CONCAT('%', #{orderNo}, '%')
+            </if>
+            <if test="bizType != null">
+                AND o.biz_type = #{bizType}
+            </if>
+            <if test="status != null">
+                AND o.status = #{status}
+            </if>
+        </where>
+        ORDER BY o.create_time DESC
+    </select>
+
+    <!-- 按订单号查询详情（关联用户信息） -->
+    <select id="selectDetailByOrderNo" resultMap="OrderPageResultMap">
+        SELECT <include refid="OrderColumnList"/>
+        FROM public.order_info o
+        LEFT JOIN public.user_info u ON o.user_id = u.id
+        WHERE o.order_no = #{orderNo,jdbcType=VARCHAR}
+          AND o.is_delete = 0
+    </select>
+
+</mapper>

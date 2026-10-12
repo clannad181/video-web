@@ -16,10 +16,12 @@ public class MessageConstant {
     public static final int TYPE_REPORT = 6;
     /** 消息类型：评论被运营屏蔽通知 */
     public static final int TYPE_COMMENT_BLOCKED = 7;
+    /** 消息类型：大会员到期通知 */
+    public static final int TYPE_VIP_EXPIRE = 8;
     /** 消息类型最小值 */
     public static final int TYPE_MIN = TYPE_VIDEO_PUBLISHED;
     /** 消息类型最大值 */
-    public static final int TYPE_MAX = TYPE_COMMENT_BLOCKED;
+    public static final int TYPE_MAX = TYPE_VIP_EXPIRE;
 
     /** 已读状态：未读 */
     public static final int READ_UNREAD = 0;
@@ -73,4 +75,8 @@ public class MessageConstant {
     public static final String TITLE_COMMENT_BLOCKED = "评论屏蔽通知";
     /** 评论屏蔽通知-内容 */
     public static final String CONTENT_COMMENT_BLOCKED = "您的视频《%s》下有一条评论因违规已被运营屏蔽";
+    /** 大会员到期通知-标题 */
+    public static final String TITLE_VIP_EXPIRE = "大会员到期通知";
+    /** 大会员到期通知-内容 */
+    public static final String CONTENT_VIP_EXPIRE = "您的大会员已到期，如需继续享受大会员权益请及时续费";
 }

@@ -30,8 +30,10 @@ public class MvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/admin/user/login", "/admin/user/captcha","/admin/user/refresh",
                         "/file/preview/**", "/file/download/**",
                         "/client/category/**", "/client/user/**", "/client/video/**", "/client/config/**",
+                        "/client/pay/**",  // 支付渠道异步通知与同步跳转回调（验签在服务内完成）
                         "/video/**",
                         "/ws/**",               // WebSocket 握手请求由 MessageHandshakeInterceptor 自行鉴权
-                        "/test/**"); // 排除不需要拦截的路径（/video/**为前台播放页，游客可访问）
+                        "/test/**",
+                        "/client/pay/alipay/*"); // 排除不需要拦截的路径（/video/**为前台播放页，游客可访问）
     }
 }

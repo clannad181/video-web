@@ -119,6 +119,8 @@ public class BaseConstant {
     public static final String WEB_CONFIG_CATEGORY_TOKEN_EXPIRY = "token_security";
     /** WebConfig 安全分类 */
     public static final String WEB_CONFIG_CATEGORY_SECURITY = "security";
+    /** WebConfig 大会员分类 */
+    public static final String WEB_CONFIG_CATEGORY_VIP = "vip";
     /** WebConfig 默认角色配置键 */
     public static final String WEB_CONFIG_KEY_DEFAULT_ROLE = "default_role";
     /** WebConfig 密码重置默认密码配置键 */
@@ -141,6 +143,8 @@ public class BaseConstant {
     public static final String WEB_CONFIG_KEY_COMMENT_NOTIFY = "commentNotify";
     /** WebConfig 举报处理结果通知开关配置键（true-举报处理完成后通知举报人，false-不发送） */
     public static final String WEB_CONFIG_KEY_REPORT_NOTIFY = "reportNotify";
+    /** WebConfig 大会员月单价配置键（元/月） */
+    public static final String WEB_CONFIG_KEY_VIP_PRICE = "vip_price_per_month";
 
     // ==================== WebConfig 通用值常量 ====================
     /** WebConfig 布尔真值 */
