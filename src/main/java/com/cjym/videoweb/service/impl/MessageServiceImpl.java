@@ -9,7 +9,9 @@ import com.cjym.videoweb.constant.MessageConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.MessageMapper;
 import com.cjym.videoweb.model.entity.MessageInfo;
+import com.cjym.videoweb.model.event.VipOpenedEvent;
 import com.cjym.videoweb.model.vo.MessageVo;
+import com.cjym.videoweb.provider.CustomThreadPoolExecutorProvider;
 import com.cjym.videoweb.service.MessagePushService;
 import com.cjym.videoweb.service.MessageService;
 import com.cjym.videoweb.utils.Base62Converter;
@@ -21,10 +23,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -36,6 +41,30 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, MessageInfo> 
 
     @Resource
     private MessagePushService messagePushService;
+
+    @Resource
+    private CustomThreadPoolExecutorProvider customThreadPoolExecutorProvider;
+
+    /**
+     * 大会员开通成功事件监听：事务提交后触发（事务回滚不发送），
+     * 落库与推送提交线程池异步执行，不阻塞支付回调主流程；发送失败仅记录日志不影响开通
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onVipOpened(VipOpenedEvent event) {
+        customThreadPoolExecutorProvider.execute(() -> {
+            try {
+                MessageInfo message = new MessageInfo();
+                message.setUserId(event.getUserId());
+                message.setType(MessageConstant.TYPE_VIP_OPENED);
+                message.setTitle(MessageConstant.TITLE_VIP_OPENED);
+                message.setContent(String.format(MessageConstant.CONTENT_VIP_OPENED, event.getDurationMonths(),
+                        event.getExpireTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
+                create(message);
+            } catch (Exception e) {
+                log.warn("大会员开通消息异步发送失败[userId={}]", event.getUserId(), e);
+            }
+        });
+    }
 
     @Override
     public void create(MessageInfo message) {

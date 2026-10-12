@@ -18,10 +18,12 @@ public class MessageConstant {
     public static final int TYPE_COMMENT_BLOCKED = 7;
     /** 消息类型：大会员到期通知 */
     public static final int TYPE_VIP_EXPIRE = 8;
+    /** 消息类型：大会员开通成功通知 */
+    public static final int TYPE_VIP_OPENED = 9;
     /** 消息类型最小值 */
     public static final int TYPE_MIN = TYPE_VIDEO_PUBLISHED;
     /** 消息类型最大值 */
-    public static final int TYPE_MAX = TYPE_VIP_EXPIRE;
+    public static final int TYPE_MAX = TYPE_VIP_OPENED;
 
     /** 已读状态：未读 */
     public static final int READ_UNREAD = 0;
@@ -79,4 +81,8 @@ public class MessageConstant {
     public static final String TITLE_VIP_EXPIRE = "大会员到期通知";
     /** 大会员到期通知-内容 */
     public static final String CONTENT_VIP_EXPIRE = "您的大会员已到期，如需继续享受大会员权益请及时续费";
+    /** 大会员开通成功-标题 */
+    public static final String TITLE_VIP_OPENED = "大会员开通成功";
+    /** 大会员开通成功-内容 */
+    public static final String CONTENT_VIP_OPENED = "恭喜！您已成功开通%d个月大会员，有效期至%s，感谢您的支持！";
 }

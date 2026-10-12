@@ -15,6 +15,7 @@ import com.cjym.videoweb.model.dto.VipRecordPageDto;
 import com.cjym.videoweb.model.entity.MessageInfo;
 import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.VipRecord;
+import com.cjym.videoweb.model.event.VipOpenedEvent;
 import com.cjym.videoweb.model.vo.VipOpenVo;
 import com.cjym.videoweb.model.vo.VipRenewVo;
 import com.cjym.videoweb.model.vo.VipStatusVo;
@@ -28,6 +29,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -46,6 +48,9 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
 
     @Resource
     private MessageService messageService;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * ES 索引同步服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（埋点静默跳过）
@@ -206,6 +211,8 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
         // 更新用户大会员状态并同步 ES
         updateUserVip(userId, true, newExpireTime);
         refreshUserEs(userId);
+        // 发布开通成功事件：站内消息通知等后续动作由监听器异步处理，与开通主流程解耦
+        eventPublisher.publishEvent(new VipOpenedEvent(userId, durationMonths, newExpireTime));
     }
 
     @Override
