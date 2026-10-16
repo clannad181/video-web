@@ -39,6 +39,7 @@
         <result column="status" property="status" jdbcType="INTEGER"/>
         <result column="type" property="type" jdbcType="INTEGER"/>
         <result column="is_vip" property="isVip" jdbcType="BOOLEAN"/>
+        <result column="vip_expire_time" property="vipExpireTime" jdbcType="TIMESTAMP"/>
         <result column="role_id" property="roleId" jdbcType="BIGINT"/>
         <result column="role_name" property="roleName" jdbcType="VARCHAR"/>
         <result column="level" property="level" jdbcType="INTEGER"/>
@@ -75,7 +76,7 @@
     <!-- ==================== 多条件分页查询用户列表（含角色名称） ==================== -->
     <select id="selectUserPage" resultMap="UserPageDtoResultMap">
         SELECT u.id, u.uid, u.user_name, u.nike_name, u.email, u.avatar,
-               u.status, u.type, u.is_vip, u.role_id, u.create_time,u.sex,u.descript,
+               u.status, u.type, u.is_vip, u.vip_expire_time, u.role_id, u.create_time,u.sex,u.descript,
                r.name AS role_name,r.level
         FROM public.user_info u
         LEFT JOIN public.role r ON u.role_id = r.id
@@ -109,7 +110,7 @@
     <!-- 管理端全局搜索用户：昵称、用户名、邮箱或uid模糊匹配，按创建时间倒序取前 limit 条 -->
     <select id="selectGlobalSearch" resultMap="UserPageDtoResultMap">
         SELECT u.id, u.uid, u.user_name, u.nike_name, u.email, u.avatar,
-               u.status, u.type, u.is_vip, u.role_id, u.create_time, u.sex, u.descript,
+               u.status, u.type, u.is_vip, u.vip_expire_time, u.role_id, u.create_time, u.sex, u.descript,
                r.name AS role_name, r.level
         FROM public.user_info u
         LEFT JOIN public.role r ON u.role_id = r.id

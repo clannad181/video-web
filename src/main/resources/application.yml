@@ -81,4 +81,4 @@ pay:
     charset: utf-8
     # 支付成功同步跳转地址（前端支付结果页，支付宝支付完成后浏览器重定向到该地址并附带订单号参数）
     returnUrl: http://localhost:5173/payResult
-    notifyUrl: https://847f-223-104-124-210.ngrok-free.app/api/client/pay/alipay/notify
+    notifyUrl: https://571a-119-103-224-172.ngrok-free.app/api/client/pay/alipay/notify

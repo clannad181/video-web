@@ -25,7 +25,7 @@ public class WebConfigController {
     }
 
     @PostMapping("/update")
-    @Operation(summary = "更新配置", description = "批量更新配置，支持一次传递多条")
+    @Operation(summary = "更新配置", description = "批量更新配置，支持一次传递多条，id为空视为新增（分类与键必填且不能重复）")
     public R<String> update(@RequestBody List<WebConfigVo> configList) {
         return webConfigService.update(configList);
     }

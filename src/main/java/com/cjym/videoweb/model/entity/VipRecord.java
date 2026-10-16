@@ -27,14 +27,21 @@ public class VipRecord {
     @Schema(description = "用户ID（关联 user_info.id）")
     private Long userId;
 
+    @Schema(description = "关联订单ID（关联 order_info.id，管理端直接开通时为 null）")
+    private Long orderId;
+
     @Schema(description = "开通时长（月，指定到期时间开通时为 null）")
     private Integer durationMonths;
+
+    @Schema(description = "权益区间起点（开通时累加基准：已是大会员时为原到期时间，否则为开通时间）")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime startTime;
 
     @Schema(description = "大会员到期时间")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime expireTime;
 
-    @Schema(description = "记录状态：0-生效中，1-已到期")
+    @Schema(description = "记录状态：0-生效中，1-已到期，2-已撤销")
     private Integer status;
 
     @Schema(description = "开通备注")
@@ -58,7 +65,7 @@ public class VipRecord {
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Long updateUser;
 
-    @Schema(description = "是否删除（0-未删除，1-已撤销）")
+    @Schema(description = "是否删除（0-未删除，1-已删除，撤销改用 status=2 状态标记）")
     @TableField(value = "is_delete", fill = FieldFill.INSERT)
     @TableLogic(value = "0", delval = "1")
     private Integer isDelete;

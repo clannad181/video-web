@@ -172,9 +172,25 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
             return R.error("配置列表不能为空");
         }
         Set<String> affectedCategories = new HashSet<>();
+        int insertCount = 0;
         for (WebConfigVo vo : configList) {
             if (vo.getId() == null) {
-                return R.error("配置ID不能为空");
+                // id 为空视为新增：分类与键必填且唯一（顺序落库，同批次新增重复也可检出）
+                if (StringUtils.isEmpty(vo.getCategory()) || StringUtils.isEmpty(vo.getKey())) {
+                    return R.error("新增配置的分类与键不能为空");
+                }
+                LambdaQueryWrapper<WebConfig> insertWrapper = new LambdaQueryWrapper<>();
+                insertWrapper.eq(WebConfig::getCategory, vo.getCategory())
+                        .eq(WebConfig::getKey, vo.getKey());
+                if (baseMapper.selectCount(insertWrapper) > 0) {
+                    return R.error("分类[" + vo.getCategory() + "]下已存在键[" + vo.getKey() + "]");
+                }
+                WebConfig config = new WebConfig();
+                BeanUtils.copyProperties(vo, config);
+                baseMapper.insert(config);
+                affectedCategories.add(vo.getCategory());
+                insertCount++;
+                continue;
             }
             WebConfig exist = baseMapper.selectById(vo.getId());
             if (exist == null) {
@@ -203,7 +219,7 @@ public class WebConfigServiceImpl extends ServiceImpl<WebConfigMapper, WebConfig
         for (String category : affectedCategories) {
             clearCache(category);
         }
-        return R.success("更新配置成功");
+        return R.success(insertCount > 0 ? "更新配置成功（新增" + insertCount + "条）" : "更新配置成功");
     }
 
     /**

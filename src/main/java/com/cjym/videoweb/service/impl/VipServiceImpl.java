@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.MessageConstant;
+import com.cjym.videoweb.constant.OrderConstant;
 import com.cjym.videoweb.constant.VipConstant;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.UserInfoMapper;
@@ -17,13 +18,19 @@ import com.cjym.videoweb.model.entity.UserInfo;
 import com.cjym.videoweb.model.entity.VipRecord;
 import com.cjym.videoweb.model.event.VipOpenedEvent;
 import com.cjym.videoweb.model.vo.VipOpenVo;
+import com.cjym.videoweb.model.vo.VipPlanVo;
+import com.cjym.videoweb.model.vo.VipPlansVo;
 import com.cjym.videoweb.model.vo.VipRenewVo;
 import com.cjym.videoweb.model.vo.VipStatusVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.EsSearchService;
 import com.cjym.videoweb.service.MessageService;
 import com.cjym.videoweb.service.VipService;
+import com.cjym.videoweb.service.WebConfigService;
 import com.cjym.videoweb.utils.JWTUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,9 +42,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -51,6 +63,12 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
+
+    @Resource
+    private WebConfigService webConfigService;
+
+    @Resource
+    private ObjectMapper objectMapper;
 
     /**
      * ES 索引同步服务：仅 elasticsearch.enabled=true 时存在，未启用时为 null（埋点静默跳过）
@@ -98,19 +116,21 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
             throw new GlobeException("前台用户不存在");
         }
         LocalDateTime now = LocalDateTime.now();
-        // 计算新到期时间：指定到期时间直接使用；按时长开通时，已是大会员的用户从现有到期时间累加
-        LocalDateTime newExpireTime = resolveExpireTime(vo.getExpireTime(), vo.getDurationMonths(),
-                user.getVipExpireTime(), now);
+        // 权益区间起点：已是大会员且未到期时从现有到期时间衔接，否则从当前时间起算
+        LocalDateTime startTime = resolveStartTime(user.getVipExpireTime(), now);
+        // 计算新到期时间：指定到期时间直接使用；按时长开通时从权益区间起点累加
+        LocalDateTime newExpireTime = resolveExpireTime(vo.getExpireTime(), vo.getDurationMonths(), startTime, now);
         // 写入开通记录
         VipRecord record = new VipRecord();
         record.setUserId(user.getId());
         record.setDurationMonths(vo.getExpireTime() == null ? vo.getDurationMonths() : null);
+        record.setStartTime(startTime);
         record.setExpireTime(newExpireTime);
         record.setStatus(VipConstant.STATUS_ACTIVE);
         record.setRemark(vo.getRemark());
         save(record);
-        // 更新用户大会员状态
-        updateUserVip(user.getId(), true, newExpireTime);
+        // 重新计算用户大会员状态：以所有生效记录的最大到期时间为准，避免覆盖其他更晚到期的记录
+        recalibrateUserVip(user.getId());
         refreshUserEs(user.getId());
         return R.success("开通大会员成功");
     }
@@ -135,6 +155,9 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
         if (VipConstant.STATUS_EXPIRED == record.getStatus()) {
             return R.error("该记录已到期，请重新开通大会员");
         }
+        if (VipConstant.STATUS_REVOKED == record.getStatus()) {
+            return R.error("该记录已撤销，请重新开通大会员");
+        }
         LocalDateTime now = LocalDateTime.now();
         // 续期基准：记录当前到期时间（已过期则从当前时间起算）
         LocalDateTime base = record.getExpireTime() != null && record.getExpireTime().isAfter(now)
@@ -142,14 +165,17 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
         LocalDateTime newExpireTime = resolveExpireTime(vo.getExpireTime(), vo.getDurationMonths(), base, now);
         record.setExpireTime(newExpireTime);
         if (vo.getExpireTime() == null) {
-            record.setDurationMonths(vo.getDurationMonths());
+            // 按时长续期：月数累加，保持记录展示的累计时长准确
+            record.setDurationMonths(record.getDurationMonths() == null
+                    ? vo.getDurationMonths()
+                    : record.getDurationMonths() + vo.getDurationMonths());
         }
         if (vo.getRemark() != null) {
             record.setRemark(vo.getRemark());
         }
         updateById(record);
-        // 同步用户大会员到期时间
-        updateUserVip(record.getUserId(), true, newExpireTime);
+        // 重新计算用户大会员状态：以所有生效记录的最大到期时间为准，避免覆盖其他更晚到期的记录
+        recalibrateUserVip(record.getUserId());
         refreshUserEs(record.getUserId());
         return R.success("续期成功");
     }
@@ -164,11 +190,22 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
         if (record == null) {
             return R.error("大会员记录不存在");
         }
-        // 逻辑删除记录（撤销）
-        removeById(id);
+        if (VipConstant.STATUS_REVOKED == record.getStatus()) {
+            return R.error("该记录已撤销");
+        }
+        // 撤销：状态置为已撤销（记录保留便于管理端追溯，不物理删除）
+        LambdaUpdateWrapper<VipRecord> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(VipRecord::getId, id)
+                .set(VipRecord::getStatus, VipConstant.STATUS_REVOKED);
+        update(wrapper);
+        // 联动调整下游生效记录：权益起点晚于被撤销记录到期时间的记录整体前移被撤销记录时长，
+        // 避免撤销中间记录后用户权益未实际扣减
+        int adjusted = shiftDownstreamRecords(record);
         // 重新计算该用户剩余生效中的记录，决定用户大会员状态
         recalibrateUserVip(record.getUserId());
-        return R.success("已撤销该大会员记录");
+        return adjusted > 0
+                ? R.success("已撤销该大会员记录，并联动调整" + adjusted + "条后续开通记录")
+                : R.success("已撤销该大会员记录");
     }
 
     @Override
@@ -185,8 +222,91 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
     }
 
     @Override
+    public VipPlansVo getVipPlans() {
+        VipPlansVo result = new VipPlansVo();
+        String plansJson = webConfigService.getConfigValue(
+                BaseConstant.WEB_CONFIG_CATEGORY_VIP, BaseConstant.WEB_CONFIG_KEY_VIP_PLANS);
+        if (StringUtils.isEmpty(plansJson)) {
+            result.setPlans(Collections.emptyList());
+            result.setVipPricePerMonth(buildMonthlyPlan(getVipMonthlyPrice()));
+            return result;
+        }
+        List<VipPlanVo> plans;
+        try {
+            plans = objectMapper.readValue(plansJson, new TypeReference<List<VipPlanVo>>() {
+            });
+        } catch (JsonProcessingException e) {
+            log.warn("大会员套餐配置解析失败[value={}]，套餐列表置空", plansJson);
+            result.setPlans(Collections.emptyList());
+            result.setVipPricePerMonth(buildMonthlyPlan(getVipMonthlyPrice()));
+            return result;
+        }
+        if (plans == null || plans.isEmpty()) {
+            result.setPlans(Collections.emptyList());
+            result.setVipPricePerMonth(buildMonthlyPlan(getVipMonthlyPrice()));
+            return result;
+        }
+        // 缺少时长或现价的非法套餐项剔除，现价/原价统一保留 2 位小数
+        List<VipPlanVo> validPlans = plans.stream()
+                .filter(p -> p.getDurationMonths() != null && p.getPrice() != null)
+                .peek(p -> {
+                    p.setPrice(p.getPrice().setScale(2, RoundingMode.HALF_UP));
+                    if (p.getOriginalPrice() != null) {
+                        p.setOriginalPrice(p.getOriginalPrice().setScale(2, RoundingMode.HALF_UP));
+                    }
+                })
+                .collect(Collectors.toList());
+        // 单月套餐与套餐数据结构一致：优先取套餐列表中 1 个月套餐，无该套餐时按月单价配置合成
+        VipPlanVo monthlyPlan = validPlans.stream()
+                .filter(p -> Integer.valueOf(1).equals(p.getDurationMonths()))
+                .findFirst()
+                .orElseGet(() -> buildMonthlyPlan(getVipMonthlyPrice()));
+        BigDecimal monthlyPrice = monthlyPlan.getPrice();
+        // autoOrig=true 时原价按月单价自动计算
+        validPlans.forEach(p -> {
+            if (Boolean.TRUE.equals(p.getAutoOrig())) {
+                p.setOriginalPrice(monthlyPrice.multiply(BigDecimal.valueOf(p.getDurationMonths()))
+                        .setScale(2, RoundingMode.HALF_UP));
+            }
+        });
+        result.setVipPricePerMonth(monthlyPlan);
+        result.setPlans(validPlans);
+        return result;
+    }
+
+    /**
+     * 合成单月套餐（套餐配置中无 1 个月套餐时使用）：结构与套餐项一致，原价等于现价
+     */
+    private VipPlanVo buildMonthlyPlan(BigDecimal monthlyPrice) {
+        VipPlanVo plan = new VipPlanVo();
+        plan.setName("1月包");
+        plan.setDurationMonths(1);
+        BigDecimal price = monthlyPrice.setScale(2, RoundingMode.HALF_UP);
+        plan.setPrice(price);
+        plan.setOriginalPrice(price);
+        return plan;
+    }
+
+    /**
+     * 读取大会员月单价（web_config 配置，缺失或格式错误时兑底默认值）
+     */
+    private BigDecimal getVipMonthlyPrice() {
+        String value = webConfigService.getConfigValue(
+                BaseConstant.WEB_CONFIG_CATEGORY_VIP, BaseConstant.WEB_CONFIG_KEY_VIP_PRICE);
+        if (StringUtils.isEmpty(value)) {
+            return OrderConstant.DEFAULT_VIP_MONTHLY_PRICE;
+        }
+        try {
+            return new BigDecimal(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("大会员月单价配置格式错误[value={}]，使用默认值{}", value, OrderConstant.DEFAULT_VIP_MONTHLY_PRICE);
+            return OrderConstant.DEFAULT_VIP_MONTHLY_PRICE;
+        }
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
-    public void openVipForOrder(Long userId, Integer durationMonths) {
+    public void openVipForOrder(Long userId, Integer durationMonths, Long orderId) {
         if (userId == null || durationMonths == null || durationMonths < 1) {
             throw new GlobeException("开通参数不合法");
         }
@@ -198,12 +318,16 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
             throw new GlobeException("用户不存在");
         }
         LocalDateTime now = LocalDateTime.now();
+        // 权益区间起点：已是大会员且未到期时从现有到期时间衔接，否则从当前时间起算
+        LocalDateTime startTime = resolveStartTime(user.getVipExpireTime(), now);
         // 已是大会员的用户从现有到期时间累加，否则从当前时间起算
-        LocalDateTime newExpireTime = resolveExpireTime(null, durationMonths, user.getVipExpireTime(), now);
+        LocalDateTime newExpireTime = resolveExpireTime(null, durationMonths, startTime, now);
         // 写入开通记录
         VipRecord record = new VipRecord();
         record.setUserId(userId);
+        record.setOrderId(orderId);
         record.setDurationMonths(durationMonths);
+        record.setStartTime(startTime);
         record.setExpireTime(newExpireTime);
         record.setStatus(VipConstant.STATUS_ACTIVE);
         record.setRemark("大会员充值" + durationMonths + "个月（订单支付）");
@@ -255,7 +379,15 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
     }
 
     /**
-     * 计算新到期时间：指定到期时间直接使用（必须晚于当前时间），否则按基准时间累加月数
+     * 计算权益区间起点：已有未过期的到期时间时从现有到期时间衔接，否则从当前时间起算
+     */
+    private LocalDateTime resolveStartTime(LocalDateTime base, LocalDateTime now) {
+        return base != null && base.isAfter(now) ? base : now;
+    }
+
+    /**
+     * 计算新到期时间：指定到期时间直接使用（必须晚于当前时间且不得早于当前生效到期时间），
+     * 否则按基准时间累加月数
      */
     private LocalDateTime resolveExpireTime(LocalDateTime expireTime, Integer durationMonths,
                                             LocalDateTime base, LocalDateTime now) {
@@ -263,10 +395,58 @@ public class VipServiceImpl extends ServiceImpl<VipRecordMapper, VipRecord> impl
             if (!expireTime.isAfter(now)) {
                 throw new GlobeException("到期时间必须晚于当前时间");
             }
+            // 防止到期时间被改早导致用户权益缩短：指定到期时间不得早于当前生效的到期时间
+            if (base != null && base.isAfter(now) && expireTime.isBefore(base)) {
+                throw new GlobeException("到期时间不能早于当前到期时间");
+            }
             return expireTime;
         }
         LocalDateTime effectiveBase = base != null && base.isAfter(now) ? base : now;
         return effectiveBase.plusMonths(durationMonths);
+    }
+
+    /**
+     * 撤销记录后联动调整其下游生效记录：将权益区间起点不早于被撤销记录到期时间的生效记录
+     * 整体前移被撤销记录的权益时长（按天数精确平移，保持权益链条连续），
+     * 前移后已过期的下游记录直接置为已到期；返回联动调整的记录条数
+     */
+    private int shiftDownstreamRecords(VipRecord revoked) {
+        // 权益区间起点：历史记录未回填时退回创建时间近似
+        LocalDateTime revokedStart = revoked.getStartTime() != null ? revoked.getStartTime() : revoked.getCreateTime();
+        if (revokedStart == null || revoked.getExpireTime() == null) {
+            return 0;
+        }
+        long durationDays = ChronoUnit.DAYS.between(revokedStart, revoked.getExpireTime());
+        if (durationDays <= 0) {
+            return 0;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        // 下游记录：同一用户、生效中、权益区间起点不早于被撤销记录到期时间（依赖链）
+        List<VipRecord> downstream = baseMapper.selectList(new LambdaQueryWrapper<VipRecord>()
+                .eq(VipRecord::getUserId, revoked.getUserId())
+                .eq(VipRecord::getStatus, VipConstant.STATUS_ACTIVE)
+                .ge(VipRecord::getStartTime, revoked.getExpireTime()));
+        int adjusted = 0;
+        for (VipRecord item : downstream) {
+            if (item.getStartTime() == null || item.getExpireTime() == null) {
+                continue;
+            }
+            item.setStartTime(item.getStartTime().minusDays(durationDays));
+            item.setExpireTime(item.getExpireTime().minusDays(durationDays));
+            if (!item.getExpireTime().isAfter(now)) {
+                // 前移后已过期的下游记录直接置为已到期，避免悬空的生效记录
+                LambdaUpdateWrapper<VipRecord> expireWrapper = new LambdaUpdateWrapper<>();
+                expireWrapper.eq(VipRecord::getId, item.getId())
+                        .set(VipRecord::getStartTime, item.getStartTime())
+                        .set(VipRecord::getExpireTime, item.getExpireTime())
+                        .set(VipRecord::getStatus, VipConstant.STATUS_EXPIRED);
+                update(expireWrapper);
+            } else {
+                updateById(item);
+            }
+            adjusted++;
+        }
+        return adjusted;
     }
 
     /**

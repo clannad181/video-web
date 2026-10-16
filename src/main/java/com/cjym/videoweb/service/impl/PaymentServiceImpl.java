@@ -9,6 +9,7 @@ import com.cjym.videoweb.service.PaymentService;
 import com.cjym.videoweb.service.VipService;
 import com.cjym.videoweb.service.pay.PaymentAdapter;
 import com.cjym.videoweb.service.pay.PaymentAdapterRegistry;
+import com.cjym.videoweb.task.OrderTimeoutQueue;
 import com.cjym.videoweb.utils.JWTUtil;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
@@ -33,6 +34,9 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Resource
     private PaymentAdapterRegistry paymentAdapterRegistry;
+
+    @Resource
+    private OrderTimeoutQueue orderTimeoutQueue;
 
     @Override
     public String createPaymentPage(String orderNo, Integer payMethod, HttpServletRequest request) {
@@ -107,13 +111,15 @@ public class PaymentServiceImpl implements PaymentService {
             order.setPayMethod(adapter.getPayMethod());
             order.setPayTime(LocalDateTime.now());
             orderInfoMapper.updateById(order);
+            // 移除延迟队列中的超时任务，避免到期后无效消费
+            orderTimeoutQueue.remove(orderNo);
             // 6. 开通大会员（大会员充值订单）
             if (OrderConstant.BIZ_TYPE_VIP_RECHARGE == order.getBizType()) {
                 if (order.getDurationMonths() == null) {
                     log.error("大会员充值订单缺少充值月数[orderNo={}]", orderNo);
                     return "failure";
                 }
-                vipService.openVipForOrder(order.getUserId(), order.getDurationMonths());
+                vipService.openVipForOrder(order.getUserId(), order.getDurationMonths(), order.getId());
             }
             log.info("支付成功[orderNo={},amount={}]", orderNo, payAmount);
             return "success";

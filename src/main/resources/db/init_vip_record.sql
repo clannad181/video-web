@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.vip_record (
     id              BIGSERIAL       PRIMARY KEY,
     user_id         BIGINT          NOT NULL,
     duration_months INTEGER,
+    start_time      TIMESTAMP,
     expire_time     TIMESTAMP       NOT NULL,
     status          SMALLINT        DEFAULT 0,
     remark          VARCHAR(256),
@@ -22,11 +23,12 @@ COMMENT ON TABLE  public.vip_record                IS '大会员开通记录表'
 COMMENT ON COLUMN public.vip_record.id             IS '主键id';
 COMMENT ON COLUMN public.vip_record.user_id        IS '用户ID（关联 user_info.id）';
 COMMENT ON COLUMN public.vip_record.duration_months IS '开通时长（月，指定到期时间开通时为 null）';
+COMMENT ON COLUMN public.vip_record.start_time      IS '权益区间起点（开通时累加基准：已是大会员时为原到期时间，否则为开通时间；撤销记录时用于联动调整下游记录）';
 COMMENT ON COLUMN public.vip_record.expire_time    IS '大会员到期时间';
-COMMENT ON COLUMN public.vip_record.status         IS '记录状态：0-生效中，1-已到期（定时任务置为1）';
+COMMENT ON COLUMN public.vip_record.status         IS '记录状态：0-生效中，1-已到期（定时任务置为1），2-已撤销（管理端撤销）';
 COMMENT ON COLUMN public.vip_record.remark         IS '开通备注';
 COMMENT ON COLUMN public.vip_record.create_time    IS '创建时间';
 COMMENT ON COLUMN public.vip_record.create_user    IS '创建人（操作管理员ID）';
 COMMENT ON COLUMN public.vip_record.update_time    IS '更新时间';
 COMMENT ON COLUMN public.vip_record.update_user    IS '更新人';
-COMMENT ON COLUMN public.vip_record.is_delete      IS '是否删除：0-未删除，1-已撤销（逻辑删除）';
+COMMENT ON COLUMN public.vip_record.is_delete      IS '是否删除：0-未删除，1-已删除（撤销改用 status=2 状态标记，该字段预留）';

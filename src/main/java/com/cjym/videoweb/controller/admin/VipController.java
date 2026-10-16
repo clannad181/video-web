@@ -29,7 +29,7 @@ public class VipController {
     private VipService vipService;
 
     @GetMapping("/list")
-    @Operation(summary = "分页查询大会员开通记录", description = "支持按用户uid/用户名模糊搜索、记录状态筛选，按创建时间倒序")
+    @Operation(summary = "分页查询大会员开通记录", description = "支持按用户uid/用户名模糊搜索、记录状态筛选（0-生效中，1-已到期，2-已撤销），按创建时间倒序")
     public R<IPage<VipRecordPageDto>> list(@RequestParam(defaultValue = "1") Integer page,
                                            @RequestParam(defaultValue = "10") Integer size,
                                            @RequestParam(required = false) String userUid,
@@ -45,19 +45,19 @@ public class VipController {
     }
 
     @PostMapping("/open")
-    @Operation(summary = "开通大会员", description = "为前台普通用户开通大会员（按用户uid），开通时长与到期时间二选一必传，已是大会员时按时长开通会在现有到期时间上累加")
+    @Operation(summary = "开通大会员", description = "为前台普通用户开通大会员（按用户uid），开通时长与到期时间二选一必传，已是大会员时按时长开通会在现有到期时间上累加，指定到期时间不得早于当前到期时间")
     public R<String> open(@RequestBody VipOpenVo vo) {
         return vipService.openVip(vo);
     }
 
     @PostMapping("/renew")
-    @Operation(summary = "续期/修改到期时间", description = "对生效中的开通记录续期，续期时长与到期时间二选一必传")
+    @Operation(summary = "续期/修改到期时间", description = "对生效中的开通记录续期，续期时长与到期时间二选一必传，指定到期时间不得早于记录当前到期时间")
     public R<String> renew(@RequestBody VipRenewVo vo) {
         return vipService.renewVip(vo);
     }
 
     @GetMapping("/delete/{id}")
-    @Operation(summary = "撤销大会员记录", description = "按记录ID撤销开通记录（逻辑删除），并重新计算用户大会员状态")
+    @Operation(summary = "撤销大会员记录", description = "按记录ID撤销开通记录（状态置为已撤销，记录保留可追溯），权益起点晚于该记录到期时间的后续生效记录将联动前移该记录时长，并重新计算用户大会员状态")
     public R<String> delete(@PathVariable Long id) {
         return vipService.revokeVip(id);
     }

@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.OrderConstant;
 import com.cjym.videoweb.constant.VipConstant;
 import com.cjym.videoweb.exception.GlobeException;
@@ -15,9 +14,12 @@ import com.cjym.videoweb.model.entity.OrderInfo;
 import com.cjym.videoweb.model.vo.OrderCancelVo;
 import com.cjym.videoweb.model.vo.OrderCreateResultVo;
 import com.cjym.videoweb.model.vo.OrderCreateVo;
+import com.cjym.videoweb.model.vo.VipPlanVo;
+import com.cjym.videoweb.model.vo.VipPlansVo;
 import com.cjym.videoweb.result.R;
 import com.cjym.videoweb.service.OrderService;
-import com.cjym.videoweb.service.WebConfigService;
+import com.cjym.videoweb.service.VipService;
+import com.cjym.videoweb.task.OrderTimeoutQueue;
 import com.cjym.videoweb.utils.Base62Converter;
 import com.cjym.videoweb.utils.JWTUtil;
 import com.cjym.videoweb.utils.SnowflakeIdGenerator;
@@ -33,17 +35,22 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
 public class OrderServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> implements OrderService {
 
     @Resource
-    private WebConfigService webConfigService;
+    private VipService vipService;
 
     @Resource
     private SnowflakeIdGenerator snowflakeIdGenerator;
+
+    @Resource
+    private OrderTimeoutQueue orderTimeoutQueue;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -55,10 +62,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> im
         if (vo.getDurationMonths() < 1 || vo.getDurationMonths() > VipConstant.MAX_DURATION_MONTHS) {
             return R.error("充值月数必须在1~" + VipConstant.MAX_DURATION_MONTHS + "个月之间");
         }
-        // 金额 = 月单价 × 月数（单价走 web_config 配置，缺失时兜底默认值）
-        BigDecimal amount = getVipMonthlyPrice()
-                .multiply(BigDecimal.valueOf(vo.getDurationMonths()))
-                .setScale(2, RoundingMode.HALF_UP);
+        // 金额按套餐配置计算：充值月数必须命中已配置的充值套餐或单月套餐（套餐配置见 web_config 的 vip/vip_pricing_plans）
+        VipPlansVo vipPlans = vipService.getVipPlans();
+        List<VipPlanVo> availablePlans = new ArrayList<>(vipPlans.getPlans());
+        availablePlans.add(vipPlans.getVipPricePerMonth());
+        VipPlanVo plan = availablePlans.stream()
+                .filter(p -> Objects.equals(p.getDurationMonths(), vo.getDurationMonths()))
+                .findFirst()
+                .orElse(null);
+        if (plan == null) {
+            return R.error("充值月数未匹配到已配置的充值套餐");
+        }
+        BigDecimal amount = plan.getPrice().setScale(2, RoundingMode.HALF_UP);
         LocalDateTime now = LocalDateTime.now();
         OrderInfo order = new OrderInfo();
         order.setOrderNo(OrderConstant.ORDER_NO_PREFIX + Base62Converter.encode(snowflakeIdGenerator.nextId()));
@@ -68,8 +83,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> im
         order.setDurationMonths(vo.getDurationMonths());
         order.setStatus(OrderConstant.STATUS_PENDING_PAY);
         order.setExpireTime(now.plusMinutes(OrderConstant.ORDER_TIMEOUT_MINUTES));
-        order.setRemark("大会员充值" + vo.getDurationMonths() + "个月");
+        order.setRemark("大会员充值" + (StringUtils.isNotEmpty(plan.getName()) ? plan.getName() : vo.getDurationMonths() + "个月"));
         save(order);
+        // 加入 Redis 延迟队列：到期后由消费线程关闭订单（Redis 异常静默降级，DB 定时扫描兜底）
+        orderTimeoutQueue.offer(order.getOrderNo(), order.getExpireTime());
         // 组装返回：订单号/金额/支付截止时间
         OrderCreateResultVo result = new OrderCreateResultVo();
         result.setOrderNo(order.getOrderNo());
@@ -101,6 +118,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> im
         }
         order.setStatus(OrderConstant.STATUS_CANCELLED);
         updateById(order);
+        // 移除延迟队列中的超时任务，避免到期后无效消费
+        orderTimeoutQueue.remove(order.getOrderNo());
         return R.success("订单已取消");
     }
 
@@ -164,21 +183,28 @@ public class OrderServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> im
         return updated ? timeoutOrders.size() : 0;
     }
 
-    /**
-     * 读取大会员月单价（web_config 配置，Redis 缓存优先；缺失或格式错误时兜底默认值）
-     */
-    private BigDecimal getVipMonthlyPrice() {
-        String value = webConfigService.getConfigValue(
-                BaseConstant.WEB_CONFIG_CATEGORY_VIP, BaseConstant.WEB_CONFIG_KEY_VIP_PRICE);
-        if (StringUtils.isEmpty(value)) {
-            return OrderConstant.DEFAULT_VIP_MONTHLY_PRICE;
+    @Override
+    public void closeTimeoutOrder(String orderNo) {
+        if (StringUtils.isEmpty(orderNo)) {
+            return;
         }
-        try {
-            return new BigDecimal(value.trim());
-        } catch (NumberFormatException e) {
-            log.warn("大会员月单价配置格式错误[value={}]，使用默认值{}", value, OrderConstant.DEFAULT_VIP_MONTHLY_PRICE);
-            return OrderConstant.DEFAULT_VIP_MONTHLY_PRICE;
+        OrderInfo order = baseMapper.selectOne(new LambdaQueryWrapper<OrderInfo>()
+                .eq(OrderInfo::getOrderNo, orderNo.trim()));
+        if (order == null) {
+            log.warn("超时关闭订单不存在[orderNo={}]", orderNo);
+            return;
         }
+        // 幂等校验：仅待支付且已过支付截止时间的订单才会被关闭（已支付/已取消直接忽略）
+        if (!Integer.valueOf(OrderConstant.STATUS_PENDING_PAY).equals(order.getStatus())) {
+            return;
+        }
+        if (order.getExpireTime() != null && order.getExpireTime().isAfter(LocalDateTime.now())) {
+            log.warn("订单支付截止时间未到[orderNo={}]，跳过关闭", orderNo);
+            return;
+        }
+        order.setStatus(OrderConstant.STATUS_CLOSED);
+        updateById(order);
+        log.info("订单超时关闭[orderNo={}]", orderNo);
     }
 
     /**

@@ -145,6 +145,8 @@ public class BaseConstant {
     public static final String WEB_CONFIG_KEY_REPORT_NOTIFY = "reportNotify";
     /** WebConfig 大会员月单价配置键（元/月） */
     public static final String WEB_CONFIG_KEY_VIP_PRICE = "vip_price_per_month";
+    /** WebConfig 大会员套餐价格配置键（JSON数组：name/durationMonths/price/originalPrice/autoOrig） */
+    public static final String WEB_CONFIG_KEY_VIP_PLANS = "vip_pricing_plans";
 
     // ==================== WebConfig 通用值常量 ====================
     /** WebConfig 布尔真值 */

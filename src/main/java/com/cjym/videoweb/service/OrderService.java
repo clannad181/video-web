@@ -43,7 +43,12 @@ public interface OrderService extends IService<OrderInfo> {
     OrderPageDto getOrderDetail(String orderNo);
 
     /**
-     * 关闭超时未支付的待支付订单（定时任务调用，返回关闭数量）
+     * 关闭超时未支付的待支付订单（兜底定时任务调用，返回关闭数量）
      */
     int closeTimeoutOrders();
+
+    /**
+     * 按订单号关闭超时订单（Redis 延迟队列消费线程调用）：仅待支付且已过支付截止时间的订单会被关闭，幂等
+     */
+    void closeTimeoutOrder(String orderNo);
 }

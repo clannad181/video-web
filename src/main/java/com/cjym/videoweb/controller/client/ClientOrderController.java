@@ -38,7 +38,7 @@ public class ClientOrderController {
     private PaymentService paymentService;
 
     @PostMapping("/create")
-    @Operation(summary = "创建大会员充值订单", description = "按充值月数下单，金额按 web_config 配置的月单价计算，返回订单号/金额/支付截止时间，需登录")
+    @Operation(summary = "创建大会员充值订单", description = "按充值月数下单，月数必须命中 web_config 配置的充值套餐（vip/vip_pricing_plans），金额按套餐现价计算，返回订单号/金额/支付截止时间，需登录")
     public R<OrderCreateResultVo> create(@RequestBody OrderCreateVo vo) {
         return orderService.createVipOrder(vo);
     }

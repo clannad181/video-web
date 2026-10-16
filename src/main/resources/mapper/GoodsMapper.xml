@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cjym.videoweb.mapper.GoodsMapper">
+
+    <!-- ==================== 商品列表/详情结果映射（含分类名称） ==================== -->
+    <resultMap id="GoodsPageResultMap" type="com.cjym.videoweb.model.dto.GoodsPageDto">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="category_id" property="categoryId" jdbcType="BIGINT"/>
+        <result column="category_label" property="categoryLabel" jdbcType="VARCHAR"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="original_price" property="originalPrice" jdbcType="DECIMAL"/>
+        <result column="discount_price" property="discountPrice" jdbcType="DECIMAL"/>
+        <result column="cover" property="cover" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="SMALLINT"/>
+        <result column="sort" property="sort" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- ==================== 通用字段列表 ==================== -->
+    <sql id="GoodsColumnList">
+        g.id, g.category_id, g.name, g.original_price, g.discount_price, g.cover,
+        g.status, g.sort, g.create_time, g.update_time,
+        d.label AS category_label
+    </sql>
+
+    <!-- 商品分页查询（关联字典数据取分类名称，按名称模糊、分类、状态筛选） -->
+    <select id="selectGoodsPage" resultMap="GoodsPageResultMap">
+        SELECT <include refid="GoodsColumnList"/>
+        FROM public.goods g
+        LEFT JOIN public.dict_data d ON g.category_id = d.id
+        <where>
+            g.is_delete = 0
+            <if test="name != null and name != ''">
+                AND g.name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="categoryId != null">
+                AND g.category_id = #{categoryId}
+            </if>
+            <if test="status != null">
+                AND g.status = #{status}
+            </if>
+        </where>
+        ORDER BY g.sort ASC, g.create_time DESC
+    </select>
+
+    <!-- 按ID查询商品详情（关联字典数据取分类名称） -->
+    <select id="selectDetailById" resultMap="GoodsPageResultMap">
+        SELECT <include refid="GoodsColumnList"/>
+        FROM public.goods g
+        LEFT JOIN public.dict_data d ON g.category_id = d.id
+        WHERE g.id = #{id,jdbcType=BIGINT}
+          AND g.is_delete = 0
+    </select>
+
+</mapper>

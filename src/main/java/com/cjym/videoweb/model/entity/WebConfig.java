@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 public class WebConfig {
 
     @Schema(description = "id")
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
 
     @Schema(description = "分类")

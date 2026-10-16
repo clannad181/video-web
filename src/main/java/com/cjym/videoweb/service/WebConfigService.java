@@ -15,7 +15,7 @@ public interface WebConfigService extends IService<WebConfig> {
     R<List<WebConfigVo>> list(String category);
 
     /**
-     * 批量更新配置
+     * 批量更新配置（id 为空视为新增）
      */
     R<String> update(List<WebConfigVo> configList);
 

@@ -27,6 +27,9 @@ public class OrderConstant {
     /** 大会员月单价默认值（元/月），web_config 配置缺失时兜底 */
     public static final BigDecimal DEFAULT_VIP_MONTHLY_PRICE = new BigDecimal("25");
 
+    /** 订单超时延迟队列 Key（Redisson 延迟队列，元素为订单号） */
+    public static final String ORDER_TIMEOUT_QUEUE_KEY = "order:timeout:queue";
+
     /** 订单支付截止时长（分钟），超时未支付自动关闭 */
     public static final long ORDER_TIMEOUT_MINUTES = 30;
 }
