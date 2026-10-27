@@ -1,0 +1,18 @@
+# 构建产物与缓存
+.gradle/
+build/
+
+# IDE 配置
+.idea/
+*.iml
+
+# 版本控制
+.git/
+.gitignore
+.gitattributes
+
+# 文档与其他
+HELP.md
+*.log
+Dockerfile
+.dockerignore
