@@ -14,10 +14,10 @@ public class EsSearchProperties {
      * 是否启用 Elasticsearch：true 时装配 ES 客户端，
      * 配合 web_config 中 search/es_search=true 时聚合搜索走 ES
      */
-    private boolean enabled = false;
+    private boolean enabled;
 
     /**
      * ES 服务地址
      */
-    private String uris = "http://localhost:9200";
+    private String uris;
 }

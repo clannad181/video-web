@@ -24,4 +24,7 @@ public class EpisodeUpdateDto {
 
     @Schema(description = "排序")
     private Integer sort;
+
+    @Schema(description = "是否需要大会员观看（不传保持原值）")
+    private Boolean needVip;
 }

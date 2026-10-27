@@ -19,6 +19,9 @@ public class ClientVideoVo {
     @Schema(description = "最新更新剧集avid（审核通过剧集中集数序号最大的一集）")
     private String episodeAvid;
 
+    @Schema(description = "是否需要大会员观看（取最新更新剧集的needVip）")
+    private Boolean needVip;
+
     @Schema(description = "播放跳转链接（如 /avXxx/episode/avYyy）")
     private String playLink;
 

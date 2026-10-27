@@ -39,6 +39,9 @@ public class VideoEpisode {
     @Schema(description = "排序")
     private Integer sort;
 
+    @Schema(description = "是否需要大会员观看")
+    private Boolean needVip;
+
     @Schema(description = "审核状态：0-待审核，1-审核通过，2-审核拒绝")
     private Integer reviewStatus;
 

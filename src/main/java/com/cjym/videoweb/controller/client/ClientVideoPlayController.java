@@ -34,6 +34,6 @@ public class ClientVideoPlayController {
     public R<ClientVideoDetailVo> play(
             @Parameter(description = "视频avid") @PathVariable String videoUid,
             @Parameter(description = "剧集avid") @PathVariable String episodeUid) {
-        return R.success(videoService.getClientPlayDetail(videoUid, episodeUid));
+        return videoService.getClientPlayDetail(videoUid, episodeUid);
     }
 }

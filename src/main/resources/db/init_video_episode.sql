@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.video_episode (
     duration        BIGINT       DEFAULT 0,
     play_url        VARCHAR(1000),
     sort            INTEGER      DEFAULT 0,
+    need_vip        BOOLEAN      DEFAULT FALSE,
     play_count      BIGINT       DEFAULT 0,
     favorite_count  BIGINT       DEFAULT 0,
     like_count      BIGINT       DEFAULT 0,
@@ -25,6 +26,7 @@ COMMENT ON COLUMN public.video_episode.title          IS '剧集标题';
 COMMENT ON COLUMN public.video_episode.duration       IS '剧集时长（秒）';
 COMMENT ON COLUMN public.video_episode.play_url       IS '播放地址';
 COMMENT ON COLUMN public.video_episode.sort           IS '排序';
+COMMENT ON COLUMN public.video_episode.need_vip       IS '是否需要大会员观看';
 COMMENT ON COLUMN public.video_episode.play_count     IS '播放数';
 COMMENT ON COLUMN public.video_episode.favorite_count IS '收藏数';
 COMMENT ON COLUMN public.video_episode.like_count     IS '点赞数';

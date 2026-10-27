@@ -10,6 +10,7 @@ import com.cjym.videoweb.constant.BaseConstant;
 import com.cjym.videoweb.constant.MessageConstant;
 import com.cjym.videoweb.constant.UserProfileConstant;
 import com.cjym.videoweb.constant.VideoConstant;
+import com.cjym.videoweb.enums.ResultEnum;
 import com.cjym.videoweb.exception.GlobeException;
 import com.cjym.videoweb.mapper.FollowMapper;
 import com.cjym.videoweb.mapper.VideoEpisodeMapper;
@@ -75,6 +76,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Slf4j
@@ -154,6 +156,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         fillFollowStatus(result.getRecords());
         // 填充播放跳转链接
         fillPlayLink(result.getRecords());
+        // 填充大会员标记（取最新更新剧集的 needVip）
+        fillNeedVip(result.getRecords());
         return result;
     }
 
@@ -194,6 +198,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         all.addAll(cards);
         fillFollowStatus(all);
         fillPlayLink(all);
+        // 填充大会员标记（取最新更新剧集的 needVip）
+        fillNeedVip(all);
         return result;
     }
 
@@ -320,8 +326,32 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         });
     }
 
+    /**
+     * 为前台视频记录填充 needVip 标记：取最新更新剧集（episodeAvid 对应剧集）的 needVip，缺失时不填充
+     */
+    private void fillNeedVip(List<ClientVideoVo> vos) {
+        List<String> episodeAvids = vos.stream()
+                .map(ClientVideoVo::getEpisodeAvid)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .collect(Collectors.toList());
+        if (episodeAvids.isEmpty()) {
+            return;
+        }
+        // 一次批量查询所有最新剧集的 needVip，避免逐条查询
+        List<VideoEpisode> episodes = videoEpisodeMapper.selectList(new LambdaQueryWrapper<VideoEpisode>()
+                .in(VideoEpisode::getAvid, episodeAvids));
+        Map<String, Boolean> needVipMap = episodes.stream()
+                .collect(Collectors.toMap(VideoEpisode::getAvid, VideoEpisode::getNeedVip, (a, b) -> a));
+        vos.forEach(vo -> {
+            if (StringUtils.isNotEmpty(vo.getEpisodeAvid())) {
+                vo.setNeedVip(needVipMap.get(vo.getEpisodeAvid()));
+            }
+        });
+    }
+
     @Override
-    public ClientVideoDetailVo getClientPlayDetail(String videoUid, String episodeUid) {
+    public R<ClientVideoDetailVo> getClientPlayDetail(String videoUid, String episodeUid) {
         if (videoUid == null || videoUid.isBlank() || episodeUid == null || episodeUid.isBlank()) {
             throw new GlobeException("视频avid和剧集avid不能为空");
         }
@@ -338,6 +368,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         if (!published && !isOwner) {
             throw new GlobeException("视频未发布，无法播放");
         }
+        // 大会员剧集播放授权：作者本人、管理员（播放审核免校验）、有效大会员（is_vip 且到期时间未过）可播放 needVip 剧集
+        boolean vipAuthorized = isOwner || isVipPlayAuthorized(currentUserId);
         // 剧集查询：普通用户仅展示审核通过的剧集，作者预览可见全部剧集
         LambdaQueryWrapper<VideoEpisode> epWrapper = new LambdaQueryWrapper<>();
         epWrapper.eq(VideoEpisode::getVideoId, videoVo.getId());
@@ -349,6 +381,10 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         List<VideoEpisodeVo> episodeVos = episodes.stream().map(ep -> {
             VideoEpisodeVo epVo = new VideoEpisodeVo();
             BeanUtils.copyProperties(ep, epVo);
+            // 未授权用户不向大会员剧集下发播放地址，仅保留跳转链接
+            if (Boolean.TRUE.equals(ep.getNeedVip()) && !vipAuthorized) {
+                epVo.setPlayUrl(null);
+            }
             // 填充每集的播放跳转链接
             if (videoVo.getAvid() != null && epVo.getAvid() != null) {
                 epVo.setPlayLink("/client/video/" + videoVo.getAvid() + "/episode/" + epVo.getAvid());
@@ -360,6 +396,22 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                 .filter(ep -> episodeUid.equals(ep.getAvid()))
                 .findFirst()
                 .orElseThrow(() -> new GlobeException(isOwner ? "剧集不存在" : "剧集不存在或未通过审核"));
+        // 大会员播放校验：needVip 剧集未授权时拒绝播放（校验前置，未授权不计入播放量）
+        ClientVideoDetailVo detail = new ClientVideoDetailVo();
+        BeanUtils.copyProperties(videoVo, detail);
+        VideoEpisodeVo currentEpisode = new VideoEpisodeVo();
+        BeanUtils.copyProperties(currentEpisodeEntity, currentEpisode);
+        if (Boolean.TRUE.equals(currentEpisodeEntity.getNeedVip()) && !vipAuthorized) {
+            episodeVos.forEach(item->{
+                item.setPlayLink("");
+                item.setPlayUrl("");
+            });
+            currentEpisode.setPlayLink("");
+            currentEpisode.setPlayUrl("");
+            detail.setEpisodes(episodeVos);
+            detail.setCurrentEpisode(currentEpisode);
+            return R.success(detail);
+        }
         // 剧集播放数+1（仅已发布视频统计，作者预览未发布稿件不计入播放量）
         if (published) {
             videoEpisodeMapper.update(null, new LambdaUpdateWrapper<VideoEpisode>()
@@ -368,8 +420,6 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
             // 用户已登录时记录观看历史
             watchHistoryService.recordPlay(videoVo.getId(), currentEpisodeEntity.getId());
         }
-        VideoEpisodeVo currentEpisode = new VideoEpisodeVo();
-        BeanUtils.copyProperties(currentEpisodeEntity, currentEpisode);
         // 当前剧集同样填充播放跳转链接
         if (videoVo.getAvid() != null && currentEpisode.getAvid() != null) {
             currentEpisode.setPlayLink("/client/video/" + videoVo.getAvid() + "/episode/" + currentEpisode.getAvid());
@@ -380,8 +430,6 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         episodeVos.forEach(epVo -> epVo.setCommentCount(commentCountMap.getOrDefault(epVo.getId(), 0L)));
         currentEpisode.setCommentCount(commentCountMap.getOrDefault(currentEpisode.getId(), 0L));
         // 组装播放详情
-        ClientVideoDetailVo detail = new ClientVideoDetailVo();
-        BeanUtils.copyProperties(videoVo, detail);
         detail.setEpisodes(episodeVos);
         detail.setCurrentEpisode(currentEpisode);
         // 标签：从 Video 实体获取并转换
@@ -394,7 +442,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         }
         // 当前用户是否已关注该UP主
         detail.setIsFollowed(isFollowedUp(videoVo.getUserId()));
-        return detail;
+        return R.success(detail);
     }
 
     /**
@@ -409,6 +457,26 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         wrapper.eq(Follow::getUserId, currentUserId)
                 .eq(Follow::getFollowUserId, followUserId);
         return followMapper.selectCount(wrapper) > 0;
+    }
+
+    /**
+     * 判断用户是否可播放大会员剧集：管理员（播放审核免校验）或有效大会员（is_vip 为 true 且到期时间未过），未登录返回 false
+     */
+    private boolean isVipPlayAuthorized(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        UserInfo viewer = userInfoMapper.selectById(userId);
+        if (viewer == null) {
+            return false;
+        }
+        // 管理员用户免校验（管理端播放审核不受大会员限制）
+        if (Objects.equals(viewer.getType(), BaseConstant.USER_TYPE_ADMIN)) {
+            return true;
+        }
+        return Boolean.TRUE.equals(viewer.getIsVip())
+                && viewer.getVipExpireTime() != null
+                && viewer.getVipExpireTime().isAfter(LocalDateTime.now());
     }
 
     @Override
@@ -603,6 +671,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                             .set(VideoEpisode::getDuration, epDto.getDuration())
                             .set(VideoEpisode::getPlayUrl, epDto.getPlayUrl())
                             .set(VideoEpisode::getSort, epDto.getSort() != null ? epDto.getSort() : i)
+                            .set(VideoEpisode::getNeedVip, Boolean.TRUE.equals(epDto.getNeedVip()))
                             .set(VideoEpisode::getReviewStatus, reviewStatus));
                     keepIds.add(ep.getId());
                 } else {
@@ -1056,6 +1125,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
                 .set(VideoEpisode::getDuration, dto.getDuration())
                 .set(VideoEpisode::getPlayUrl, dto.getPlayUrl())
                 .set(dto.getSort() != null, VideoEpisode::getSort, dto.getSort())
+                .set(dto.getNeedVip() != null, VideoEpisode::getNeedVip, dto.getNeedVip())
                 .set(VideoEpisode::getReviewStatus, reviewStatus));
         // 时长可能变化，重算视频的总集数和总时长
         recalculateVideoStats(video.getId());
@@ -1135,6 +1205,8 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         // 填充播放跳转链接与关注标记
         fillPlayLink(result.getRecords());
         fillFollowStatus(result.getRecords());
+        // 填充大会员标记（取最新更新剧集的 needVip）
+        fillNeedVip(result.getRecords());
         return result;
     }
 
@@ -1222,6 +1294,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         ep.setDuration(epDto.getDuration());
         ep.setPlayUrl(epDto.getPlayUrl());
         ep.setSort(epDto.getSort() != null ? epDto.getSort() : index);
+        ep.setNeedVip(Boolean.TRUE.equals(epDto.getNeedVip()));
         ep.setPlayCount(0L);
         ep.setFavoriteCount(0L);
         ep.setLikeCount(0L);
@@ -1249,6 +1322,7 @@ public class VideoServiceImpl extends ServiceImpl<VideoMapper, Video> implements
         ep.setDuration(epDto.getDuration());
         ep.setPlayUrl(epDto.getPlayUrl());
         ep.setSort(epDto.getSort() != null ? epDto.getSort() : index);
+        ep.setNeedVip(Boolean.TRUE.equals(epDto.getNeedVip()));
         ep.setPlayCount(0L);
         ep.setFavoriteCount(0L);
         ep.setLikeCount(0L);

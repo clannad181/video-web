@@ -63,7 +63,7 @@ public interface VideoService extends IService<Video> {
     /**
      * 前台视频播放详情：根据视频avid和剧集avid返回视频信息+审核通过剧集列表+当前剧集+UP主信息（仅限已发布视频）
      */
-    ClientVideoDetailVo getClientPlayDetail(String videoUid, String episodeUid);
+    R<ClientVideoDetailVo> getClientPlayDetail(String videoUid, String episodeUid);
 
     /**
      * 查询视频详情（含剧集和标签）

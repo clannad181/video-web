@@ -23,6 +23,9 @@ spring:
       matching-strategy: ant_path_matcher
   application:
     name: video-web
+  # Spring 标准 ES 配置（供 actuator 健康检查使用），与顶层自定义 elasticsearch.uris 对齐
+  elasticsearch:
+    uris: ${elasticsearch.uris}
   # 数据源配置
   datasource:
     url: jdbc:postgresql://192.168.225.129:5432/video?currentSchema=public&sslmode=disable
@@ -51,6 +54,12 @@ file:
 elasticsearch:
   enabled: true                     # 总开关：true 时装配 ES 客户端，配合 web_config 中 search/es_search=true 时搜索走 ES
   uris: http://192.168.225.129:9200  # ES 服务地址
+
+# Actuator 健康检查：ES 健康指示器跟随总开关，地址对齐 spring.elasticsearch.uris
+management:
+  health:
+    elasticsearch:
+      enabled: ${elasticsearch.enabled}
 
 # MyBatis-Plus 配置
 mybatis-plus:

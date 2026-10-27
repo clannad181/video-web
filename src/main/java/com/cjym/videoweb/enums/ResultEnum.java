@@ -34,6 +34,8 @@ public enum ResultEnum {
   LEND_FULL_SCALE_ERROR(306, "已满标，无法投标"),
   NOT_SUFFICIENT_FUNDS_ERROR(307, "余额不足，请充值"),
   FORBIDDEN_ERROR(403, "无权限访问"),
+  VIP_LOGIN_REQUIRED(403, "该剧集为大会员专享，请先登录"),
+  VIP_REQUIRED(419, "该剧集为大会员专享，请开通大会员后观看"),
   PAY_UNIFIEDORDER_ERROR(401, "统一下单错误"),
   ALIYUN_SMS_LIMIT_CONTROL_ERROR(-502, "短信发送过于频繁"),//业务限流
   ALIYUN_SMS_ERROR(-503, "短信发送失败"),//其他失败
