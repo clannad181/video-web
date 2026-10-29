@@ -18,7 +18,7 @@ WORKDIR /app
 # 时区与 JVM 参数（运行时可被 docker run -e 覆盖）
 ENV TZ=Asia/Shanghai \
     JAVA_OPTS="-Xms256m -Xmx512m -Dfile.encoding=UTF-8" \
-    # 文件上传目录（覆盖 application.yml 中 Windows 路径 D:/uploads，可挂载宿主机目录持久化）
+    # 容器内文件上传目录（覆盖 application.yml 中 Windows 路径 D:/uploads，可挂载宿主机目录持久化）
     FILE_UPLOAD_PATH=/data/uploads
 
 # 创建文件上传目录

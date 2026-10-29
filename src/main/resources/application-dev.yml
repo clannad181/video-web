@@ -1,0 +1,29 @@
+# 服务端口
+server:
+  servlet:
+    context-path: /api
+  port: 8899
+
+spring:
+  cloud:
+    nacos:
+      server-addr: 192.168.225.129:8848
+      username: nacos
+      password: nacos
+      namespace: 1789db4f-7fa7-46a4-92e9-c0674ac09b6f
+      group: DEFAULT_GROUP
+      discovery:
+        server-addr: ${spring.cloud.nacos.server-addr}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        namespace: ${spring.cloud.nacos.namespace}
+        group: ${spring.cloud.nacos.group}
+      config:
+        server-addr: ${spring.cloud.nacos.server-addr}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        namespace: ${spring.cloud.nacos.namespace}
+        group: ${spring.cloud.nacos.group}
+  config:
+    ## 采用新版的nacos配置
+    import[0]: nacos:video-web.yaml

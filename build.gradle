@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-//    id 'org.springframework.boot' version '3.1.4'
     id 'org.springframework.boot' version '3.3.13'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -8,6 +7,17 @@ plugins {
 group = 'com.cjym'
 version = '0.0.1-SNAPSHOT'
 description = 'video-web'
+
+// Spring Cloud Alibaba 版本统一管理（2023.0.3.4 基于 Spring Cloud 2023.0.4，适配 Spring Boot 3.3.x）
+dependencyManagement {
+    imports {
+        // 需显式导入 Spring Cloud BOM：alibaba BOM 的扁平化 POM 只管理 com.alibaba.cloud:* 组件，
+        // 不管理 org.springframework.cloud:*（依赖 Maven parent 继承，Gradle 不解析），
+        // 缺失会导致 spring-cloud-starter-bootstrap 等依赖解析不到版本
+        mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2023.0.4'
+        mavenBom 'com.alibaba.cloud:spring-cloud-alibaba-dependencies:2023.0.3.4'
+    }
+}
 
 java {
     toolchain {
@@ -71,6 +81,11 @@ dependencies {
 
     // 支付宝开放平台 Java SDK（支付）
     implementation 'com.alipay.sdk:alipay-sdk-java:4.38.157.ALL'
+
+    // Nacos 配置中心（版本由 Spring Cloud Alibaba BOM 管理）
+    implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config'
+    // Nacos 注册中心（自带 Spring Cloud LoadBalancer，服务发现与调用）
+    implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
 
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
