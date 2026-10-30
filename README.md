@@ -165,6 +165,3 @@ docker run -d --name video-web \
 - 标识符约定：对外传输使用业务 UID（如视频 `episodeUid`/`avid`、收藏夹 `folderUid`、用户 `userUid`），禁止传递数据库主键 ID
 - 日期时间格式：`yyyy-MM-dd HH:mm:ss`
 
-## License
-
-内部学习项目，暂未开源授权。
