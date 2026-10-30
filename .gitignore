@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Nacos ###
+# 包含敏感凭据（数据库密码、邮箱授权码、支付宝私钥），禁止提交
+nacos-config-dump.yaml
